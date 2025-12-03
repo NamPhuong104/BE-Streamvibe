@@ -1,0 +1,28 @@
+# Maven
+target/
+!target/movieapp-0.0.1-SNAPSHOT.jar
+
+# IDE
+.idea/
+.vscode/
+*.iml
+
+# Git
+.git/
+.gitignore
+
+# Docker
+Dockerfile
+docker-compose.yml
+.dockerignore
+
+# Env
+.env
+*.env
+
+# Logs
+*.log
+
+# OS
+.DS_Store
+Thumbs.db

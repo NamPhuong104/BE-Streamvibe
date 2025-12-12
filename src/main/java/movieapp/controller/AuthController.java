@@ -47,14 +47,13 @@ public class AuthController {
     @PostMapping("/register")
     @ApiMessage("Đăng ký tài khoản thành công")
     public ResponseEntity<ResUserDTO> register(@Valid @RequestBody UseCreateDTO registerDto) throws IdInvalidException {
-        // Gọi lại service tạo user (đã có logic mã hóa pass rồi)
         ResUserDTO newUser = userService.handleCreateUser(registerDto);
         return ResponseEntity.status(HttpStatus.CREATED).body(newUser);
     }
 
     @PostMapping("/login")
     @ApiMessage("Login Successfully")
-    public ResponseEntity<?> login(@Valid @RequestBody ReqLoginDTO loginDTO) {
+    public ResponseEntity<?> login(@Valid @RequestBody ReqLoginDTO loginDTO) throws UsernameNotFoundException {
         try {
             // 1. Nạp username/password vào Security để check
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(loginDTO.getUsername(), loginDTO.getPassword());

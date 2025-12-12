@@ -19,12 +19,10 @@ public class UserDetailsCustom implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // 1. Gọi Service tìm user trong DB (username ở đây chính là email)
-        movieapp.domain.User user;
-        try {
-            user = userService.handleFindUserByEmailEntity(username);
-        } catch (Exception e) {
+        movieapp.domain.User user = userService.handleFindUserByEmailEntity(username);
+        if (user == null)
             throw new UsernameNotFoundException("Username/password không hợp lệ");
-        }
+
         // 2. Trả về User của Spring Security
         return new User(user.getEmail(), user.getPassword(), Collections.singletonList(new SimpleGrantedAuthority("ROLE_USER")));
     }

@@ -30,7 +30,8 @@ public class EmailService {
             String resetUrl = frontendUrl + "/reset-password?token=" + token;
             String htmlTemplate = loadHtmlTemplate("templates/reset-password.html");
             String htmlContent = htmlTemplate.replace("{{RESET_URL}}", resetUrl)
-                    .replace("{{USER_NAME}}", userName != null ? userName : "");
+                    .replace("{{USER_NAME}}", userName != null ? userName : "")
+                    .replace("{{TOKEN}}", token);
 
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
@@ -54,7 +55,8 @@ public class EmailService {
             String verifyUrl = frontendUrl + "/verify-email?token=" + token;
             String htmlTemplate = loadHtmlTemplate("templates/active-email.html");
             String htmlContent = htmlTemplate.replace("{{VERIFY_URL}}", verifyUrl)
-                    .replace("{{USER_NAME}}", userName != null ? userName : "");
+                    .replace("{{USER_NAME}}", userName != null ? userName : "")
+                    .replace("{{TOKEN}}", token);
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
                     message,
@@ -77,7 +79,8 @@ public class EmailService {
             String verifyUrl = frontendUrl + "/change-email/confirm?token=" + token;
             String htmlTemplate = loadHtmlTemplate("templates/change-email.html");
             String htmlContent = htmlTemplate.replace("{{VERIFY_URL}}", verifyUrl).replace("{{USER_NAME}}", userName != null ? userName : "")
-                    .replace("{{CURRENT_EMAIL}}", currentEmail).replace("{{NEW_EMAIL}}", newEmail);
+                    .replace("{{CURRENT_EMAIL}}", currentEmail).replace("{{NEW_EMAIL}}", newEmail)
+                    .replace("{{TOKEN}}", token);
             MimeMessage message = mailSender.createMimeMessage();
             MimeMessageHelper helper = new MimeMessageHelper(
                     message,

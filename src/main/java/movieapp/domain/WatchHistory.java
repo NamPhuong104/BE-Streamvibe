@@ -4,6 +4,7 @@ import jakarta.persistence.*;
 import lombok.*;
 import org.springframework.cglib.core.Local;
 
+import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -35,6 +36,9 @@ public class WatchHistory {
 
     @Column(name = "movie_name")
     private String movieName;
+
+    @Column(name = "origin_name")
+    private String originName;
 
     @Column(name = "movie_type")
     private String movieType;
@@ -71,15 +75,17 @@ public class WatchHistory {
 
     @PrePersist
     protected void onCreate() {
-        this.createdAt = LocalDateTime.now();
-        this.lastWatchedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        this.createdAt = now;
+        this.lastWatchedAt = now;
         if (this.completed == null) this.completed = false;
     }
 
     @PreUpdate
     protected void onUpdate() {
-        this.lastWatchedAt = LocalDateTime.now();
-        updatedAt = LocalDateTime.now();
+        LocalDateTime now = LocalDateTime.now();
+        this.lastWatchedAt = now;
+        updatedAt = now;
     }
 
 }

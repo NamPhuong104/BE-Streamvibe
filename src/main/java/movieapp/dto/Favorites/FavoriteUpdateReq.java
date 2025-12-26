@@ -13,4 +13,6 @@ public class FavoriteUpdateReq {
     private String posterUrl;
     private String thumbUrl;
     private String episodeCurrent;
+    private String lang;
+    private String quality;
 }

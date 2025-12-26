@@ -286,8 +286,8 @@ public class CachedSectionService {
             log.debug("📄 Fetching content for: {}", item.getSlug());
             OphimMovieDetailResponse detailResponse = ophimClient.getMovieDetail(item.getSlug());
             dto.setContent(detailResponse.getData().getItem().getContent());
-            dto.setOptimizedThumb(imageService.optimizeThumb(detailResponse.getData().getItem().getThumbUrl()));
-            dto.setOptimizedPoster(imageService.optimizedPoster(detailResponse.getData().getItem().getPosterUrl()));
+            dto.setOptimizedThumb(imageService.optimizeThumb(detailResponse.getData().getItem().getThumbUrl(), detailResponse.getData().getItem().getSlug()));
+            dto.setOptimizedPoster(imageService.optimizedPoster(detailResponse.getData().getItem().getPosterUrl(), detailResponse.getData().getItem().getSlug()));
         } catch (Exception e) {
             log.warn("⚠️ Failed to fetch content for {}: {}", item.getSlug(), e.getMessage());
             dto.setContent(null);
@@ -300,8 +300,8 @@ public class CachedSectionService {
         MovieItemDTO dto = new MovieItemDTO();
         BeanUtils.copyProperties(item, dto);
 
-        dto.setOptimizedThumb(imageService.optimizeThumb(item.getThumbUrl()));
-        dto.setOptimizedPoster(imageService.optimizedPoster(item.getPosterUrl()));
+        dto.setOptimizedThumb(imageService.optimizeThumb(item.getThumbUrl(), item.getSlug()));
+        dto.setOptimizedPoster(imageService.optimizedPoster(item.getPosterUrl(), item.getSlug()));
         dto.setContent(null);
 
         return dto;

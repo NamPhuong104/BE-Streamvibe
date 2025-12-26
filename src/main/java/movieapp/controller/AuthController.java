@@ -55,6 +55,21 @@ public class AuthController {
     @ApiMessage("Login Successfully")
     public ResponseEntity<?> login(@Valid @RequestBody ReqLoginDTO loginDTO) throws UsernameNotFoundException {
         try {
+            // Lấy thông tin user từ DB
+            User currentUser = userService.handleFindUserByEmailEntity(loginDTO.getUsername());
+            if (currentUser == null)
+                throw new UsernameNotFoundException("User không tồn tại");
+
+            if ("GOOGLE".equals(currentUser.getProvider()) && currentUser.getPassword() == null || currentUser.getPassword().isEmpty()) {
+                RestResponse<Object> error = new RestResponse<>();
+                error.setStatusCode(401);
+                error.setError("Unauthorized");
+                error.setMessage("Tài khoản chưa tạo mật khẩu, vui lòng đăng nhập bằng Google hoặc tạo mật khẩu trong cài đặt");
+                error.setData(null);
+                return ResponseEntity.status(401).body(error);
+            }
+
+
             // 1. Nạp username/password vào Security để check
             UsernamePasswordAuthenticationToken authenticationToken = new UsernamePasswordAuthenticationToken(loginDTO.getUsername(), loginDTO.getPassword());
             // 2. Xác thực (Sẽ gọi UserDetailsCustom để check DB)
@@ -64,8 +79,6 @@ public class AuthController {
             // 4. Tạo Token trả về
             ResLoginDTO res = new ResLoginDTO();
 
-            // Lấy thông tin user từ DB
-            User currentUser = userService.handleFindUserByEmailEntity(loginDTO.getUsername());
             if (currentUser != null) {
                 ResLoginDTO.UserLogin userLogin = new ResLoginDTO.UserLogin(
                         currentUser.getId(),

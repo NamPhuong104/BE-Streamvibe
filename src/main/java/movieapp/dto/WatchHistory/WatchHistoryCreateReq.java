@@ -14,6 +14,7 @@ public class WatchHistoryCreateReq {
     private String movieSlug;
 
     private String movieName;
+    private String originName;
     private String movieThumb;
     private String movieType;
 

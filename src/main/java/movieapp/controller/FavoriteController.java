@@ -30,6 +30,25 @@ public class FavoriteController {
         return ResponseEntity.status(HttpStatus.OK).body(favoriteService.handleGetAllFavorite(spec, pageable));
     }
 
+    @GetMapping("/me")
+    @ApiMessage("Get Favorite By Me")
+    public ResponseEntity<ResultPaginationDTO> getFavoriteByMe(Pageable pageable) throws IdInvalidException {
+        return ResponseEntity.status(HttpStatus.OK).body(favoriteService.handleGetFavoriteByMe(pageable));
+    }
+
+    @GetMapping("/me/checkIsExist/{movieSlug}")
+    @ApiMessage("Check Is Exits Favorite By Movie Slug")
+    public ResponseEntity<Boolean> getIsFavoriteByMovieSlug(@PathVariable String movieSlug) {
+        return ResponseEntity.status(200).body(favoriteService.handleCheckIsFavorite(movieSlug));
+    }
+
+    @DeleteMapping("/me/{movieSlug}")
+    @ApiMessage("Delete By Movie Slug")
+    public ResponseEntity<Void> deleteBySlug(@PathVariable String movieSlug) throws IdInvalidException {
+        favoriteService.handleDeleteByMovieSlug(movieSlug);
+        return ResponseEntity.ok(null);
+    }
+
     @GetMapping("/{id}")
     @ApiMessage("Get Favorite By Id")
     public ResponseEntity<FavoriteRes> getFavoriteById(@PathVariable("id") long id) throws IdInvalidException {

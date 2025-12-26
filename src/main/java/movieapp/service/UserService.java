@@ -7,6 +7,7 @@ import movieapp.dto.User.Request.UseCreateDTO;
 import movieapp.dto.User.Request.UserUpdateDTO;
 import movieapp.dto.User.Response.ResUserDTO;
 import movieapp.repository.UserRepository;
+import movieapp.util.Util;
 import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -19,7 +20,6 @@ import org.springframework.web.server.ResponseStatusException;
 import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
-import java.util.UUID;
 import java.util.stream.Collectors;
 
 @Service
@@ -147,13 +147,14 @@ public class UserService {
         newUser.setIsActive(true);
         newUser.setIsEmailVerified(false);
 
-        String verifyToken = UUID.randomUUID().toString();
-        newUser.setVerifyEmailToken(verifyToken);
+        String tokenOtp = Util.generateOtp();
+
+        newUser.setVerifyEmailToken(tokenOtp);
         newUser.setVerifyEmailExpiry(LocalDateTime.now().plusHours(24));
 
         userRepository.save(newUser);
         String displayName = newUser.getFullName() != null ? newUser.getFullName() : newUser.getUsername();
-        emailService.sendActiveEmail(newUser.getEmail(), displayName, verifyToken);
+        emailService.sendActiveEmail(newUser.getEmail(), displayName, tokenOtp);
 
         return convertToResUserDTO(newUser);
     }
@@ -185,14 +186,14 @@ public class UserService {
     public void handleForgotPassword(String email) throws IdInvalidException {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Email " + email + " không tồn tại!"));
 
-        String token = UUID.randomUUID().toString();
+        String tokenOtp = Util.generateOtp();
 
-        user.setResetPasswordToken(token);
+        user.setResetPasswordToken(tokenOtp);
         user.setResetPasswordExpiry(LocalDateTime.now().plusMinutes(5));
         userRepository.save(user);
         String displayName = user.getFullName() != null ? user.getFullName() : user.getUsername();
 
-        emailService.sendResetPasswordEmail(user.getEmail(), displayName, token);
+        emailService.sendResetPasswordEmail(user.getEmail(), displayName, tokenOtp);
     }
 
     public void handleResetPassword(String token, String newPassword) throws IdInvalidException {
@@ -225,14 +226,14 @@ public class UserService {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("User với email " + email + " không tồn tại!"));
         if (user.getIsEmailVerified() == true) throw new IdInvalidException("Tài khoản đã kích hoạt email");
 
-        String token = UUID.randomUUID().toString();
-        user.setVerifyEmailToken(token);
+        String tokenOtp = Util.generateOtp();
+        user.setVerifyEmailToken(tokenOtp);
         user.setVerifyEmailExpiry(LocalDateTime.now().plusMinutes(5));
 
         userRepository.save(user);
 
         String displayName = user.getFullName() != null ? user.getFullName() : user.getUsername();
-        emailService.sendActiveEmail(email, displayName, token);
+        emailService.sendActiveEmail(email, displayName, tokenOtp);
     }
 
     public void handleChangeEmail(String currentEmail, String newEmail, String currentPassword) throws IdInvalidException {
@@ -247,16 +248,16 @@ public class UserService {
         if (userRepository.existsByEmail(newEmail))
             throw new IdInvalidException("Email " + newEmail + " đã tồn tại, vui lòng dùng email khác");
 
-        String token = UUID.randomUUID().toString();
+        String tokenOtp = Util.generateOtp();
         user.setPendingEmail(newEmail);
-        user.setChangeEmailToken(token);
+        user.setChangeEmailToken(tokenOtp);
         user.setChangeEmailExpiry(LocalDateTime.now().plusHours(24));
 
         userRepository.save(user);
 
         String displayName = user.getFullName() != null ? user.getFullName() : user.getUsername();
         emailService.sendWarningEmail(currentEmail, displayName, currentEmail, newEmail);
-        emailService.sendChangeEmail(newEmail, displayName, currentEmail, newEmail, token);
+        emailService.sendChangeEmail(newEmail, displayName, currentEmail, newEmail, tokenOtp);
     }
 
     public void handleConfirmChangeEmail(String token) throws IdInvalidException {

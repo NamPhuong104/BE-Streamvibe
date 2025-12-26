@@ -32,9 +32,15 @@ public class Favorite {
 
     @Column(name = "poster_url")
     private String posterUrl;
-
+    
     @Column(name = "thumb_url")
     private String thumbUrl;
+
+    @Column(name = "lang")
+    private String lang;
+
+    @Column(name = "quality")
+    private String quality;
 
     @Column(name = "episode_current")
     private String episodeCurrent;

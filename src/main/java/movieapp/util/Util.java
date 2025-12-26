@@ -2,8 +2,12 @@ package movieapp.util;
 
 import org.springframework.stereotype.Component;
 
+import java.security.SecureRandom;
+
 @Component
 public class Util {
+    private static final SecureRandom random = new SecureRandom();
+
     public String normalizeEpisode(String episodeSlug) {
         if (episodeSlug == null || episodeSlug.trim().isEmpty()) return null;
         return episodeSlug.trim();
@@ -33,4 +37,10 @@ public class Util {
         if (value == null || value.trim().isEmpty()) return null;
         return value.trim();
     }
+
+    public static String generateOtp() {
+        int otp = random.nextInt(1_000_000);
+        return String.format("%06d", otp);
+    }
+
 }

@@ -5,10 +5,12 @@ import com.cloudinary.utils.ObjectUtils;
 import lombok.extern.slf4j.Slf4j;
 import movieapp.domain.OptimizedImage;
 import movieapp.repository.OptimizedImageRepository;
+import movieapp.util.error.IdInvalidException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Optional;
 
 @Service
 @Slf4j
@@ -27,7 +29,7 @@ public class ImageOptimizationService {
         this.imageRepository = imageRepository;
     }
 
-    public String optimizeThumb(String thumbUrl) {
+    public String optimizeThumb(String thumbUrl, String slug) {
         if (thumbUrl == null || thumbUrl.isEmpty()) {
             return null;
         }
@@ -39,7 +41,7 @@ public class ImageOptimizationService {
 
         String cloudUrl = imageRepository.findByOriginalUrl(fullUrl).map(OptimizedImage::getCloudinaryUrl).orElseGet(() -> {
             try {
-                return uploadToCloudinarySync(fullUrl, "thumb");
+                return uploadToCloudinarySync(fullUrl, "thumb", slug);
             } catch (Exception e) {
                 log.warn("⚠️ Failed to upload thumb, using original: {}", e.getMessage());
                 return fullUrl;
@@ -49,7 +51,7 @@ public class ImageOptimizationService {
         return transformUrl(cloudUrl, "w_342,c_fill,q_auto:best,f_auto");
     }
 
-    public String optimizedPoster(String posterUrl) {
+    public String optimizedPoster(String posterUrl, String slug) {
         if (posterUrl == null || posterUrl.isEmpty()) {
             return null;
         }
@@ -61,7 +63,7 @@ public class ImageOptimizationService {
                 .map(OptimizedImage::getCloudinaryUrl)
                 .orElseGet(() -> {
                     try {
-                        return uploadToCloudinarySync(fullUrl, "poster");
+                        return uploadToCloudinarySync(fullUrl, "poster", slug);
                     } catch (Exception e) {
                         log.warn("⚠️ Failed to upload poster, using original: {}", e.getMessage());
                         return fullUrl;
@@ -96,7 +98,7 @@ public class ImageOptimizationService {
         return url.replace("upload", "/upload/" + transformation + "/");
     }
 
-    private String uploadToCloudinarySync(String imageUrl, String type) {
+    private String uploadToCloudinarySync(String imageUrl, String type, String slug) {
         try {
             log.info("📤 Uploading {} to Cloudinary: {}", type, imageUrl);
 
@@ -115,6 +117,7 @@ public class ImageOptimizationService {
                     .cloudinaryUrl(cloudinaryUrl)
                     .imageType(type)
                     .cloudinaryPublicId(publicId)
+                    .slug(slug)
                     .build();
 
             imageRepository.save(optimizedImage);
@@ -129,7 +132,7 @@ public class ImageOptimizationService {
         }
     }
 
-    private String buildFullUrl(String imageUrl) {
+    public String buildFullUrl(String imageUrl) {
         if (imageUrl.startsWith("http")) {
             return imageUrl;
         }

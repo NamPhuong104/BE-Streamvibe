@@ -11,11 +11,17 @@ public class WatchHistoryRes {
 
     private String movieSlug;
     private String movieName;
+    private String originName;
     private String movieType;
 
     private String episodeSlug;
     private String episodeName;
     private String serverName;
+
+    private String posterUrl;
+    private String thumbUrl;
+    private String optimizedPoster;
+    private String optimizedThumb;
 
     private Long currentTime;
     private Long duration;

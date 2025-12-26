@@ -2,6 +2,8 @@ package movieapp.repository;
 
 import movieapp.domain.Favorite;
 import movieapp.domain.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.stereotype.Repository;
@@ -16,4 +18,8 @@ public interface FavoriteRepository extends JpaRepository<Favorite, Long>, JpaSp
     Optional<Favorite> findByUserAndMovieSlug(User user, String movieSlug);
 
     boolean existsByUserAndMovieSlug(User user, String movieSlug);
+
+    Page<Favorite> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
+
+    void deleteByUserAndMovieSlug(User user, String movieSlug);
 }

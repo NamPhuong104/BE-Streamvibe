@@ -11,7 +11,6 @@ import movieapp.dto.WatchHistory.WatchHistoryUpdateReq;
 import movieapp.service.WatchHistoryService;
 import movieapp.util.annotation.ApiMessage;
 import movieapp.util.error.IdInvalidException;
-import org.checkerframework.checker.units.qual.A;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -23,6 +22,28 @@ import org.springframework.web.bind.annotation.*;
 @RequestMapping("/watch-history")
 public class WatchHistoryController {
     private final WatchHistoryService watchHistoryService;
+
+    @GetMapping("/me")
+    @ApiMessage("Get watch history by me")
+    public ResponseEntity<ResultPaginationDTO> getWatchHistoryByMe(Pageable pageable) throws IdInvalidException {
+        return ResponseEntity.status(200).body(watchHistoryService.handleGetWatchHistoryByMe(pageable));
+    }
+
+    @GetMapping("/me/progress/{movieSlug}")
+    @ApiMessage("Get watch progress")
+    public ResponseEntity<WatchHistoryRes> getWatchProgress(
+            @PathVariable String movieSlug,
+            @RequestParam(required = false) String episodeSlug
+    ) throws IdInvalidException {
+        return ResponseEntity.ok(watchHistoryService.getWatchProgress(movieSlug, episodeSlug));
+    }
+
+    @DeleteMapping("/me/{movieSlug}")
+    @ApiMessage("Delete Watch History By Movie Slug")
+    public ResponseEntity<Void> deleteWatchHistoryBySlug(@PathVariable String movieSlug) throws IdInvalidException {
+        watchHistoryService.handleDeleteWatchHistoryBySlug(movieSlug);
+        return ResponseEntity.ok().body(null);
+    }
 
 
     @GetMapping

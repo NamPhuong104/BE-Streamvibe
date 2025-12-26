@@ -15,12 +15,20 @@ public class FavoriteCreateReq {
     @NotBlank(message = "Tên phim không được để trống")
     private String movieName;
 
-    @NotBlank(message = "Origin name phim không được để trống")
+    @NotBlank(message = "Origin name không được để trống")
     private String originName;
 
     private String posterUrl;
+
+    @NotBlank(message = "ThumbUrl không được để trống")
     private String thumbUrl;
 
     @NotBlank(message = "Episode current không được để trống")
     private String episodeCurrent;
+    
+    @NotBlank(message = "Language không được để trống")
+    private String lang;
+
+    @NotBlank(message = "Quality không được để trống")
+    private String quality;
 }

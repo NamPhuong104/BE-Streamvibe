@@ -20,7 +20,7 @@ public class UserUpdateDTO {
     @NotEmpty(message = "FullName không được để trống")
     private String fullName;
 
-    @NotBlank(message = "avatarUrl không được có kí tự trắng ở đầu")
-    @NotEmpty(message = "avatarUrl không được để trống")
+    //    @NotBlank(message = "avatarUrl không được có kí tự trắng ở đầu")
+//    @NotEmpty(message = "avatarUrl không được để trống")
     private String avatarUrl;
 }

@@ -1,4 +1,4 @@
-package movieapp.dto.User.Request;
+package movieapp.dto.User;
 
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;

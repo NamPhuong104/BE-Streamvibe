@@ -79,6 +79,10 @@ public class User {
     @JsonIgnore
     private List<WatchHistory> watchHistories;
 
+    @OneToMany(mappedBy = "user", fetch = FetchType.LAZY)
+    @JsonIgnore
+    private List<Playlist> playlists;
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();

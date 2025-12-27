@@ -3,9 +3,9 @@ package movieapp.service;
 import lombok.RequiredArgsConstructor;
 import movieapp.domain.User;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
-import movieapp.dto.User.Request.UseCreateDTO;
-import movieapp.dto.User.Request.UserUpdateDTO;
-import movieapp.dto.User.Response.ResUserDTO;
+import movieapp.dto.User.UseCreateDTO;
+import movieapp.dto.User.UserUpdateDTO;
+import movieapp.dto.User.ResUserDTO;
 import movieapp.repository.UserRepository;
 import movieapp.util.Util;
 import movieapp.util.error.IdInvalidException;
@@ -28,6 +28,7 @@ public class UserService {
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
     private final EmailService emailService;
+    private final WatchHistoryService watchHistoryService;
 
     public ResUserDTO convertToResUserDTO(User user) {
         ResUserDTO res = new ResUserDTO();
@@ -178,8 +179,11 @@ public class UserService {
 
     public void handleDeleteUser(Long id) throws IdInvalidException {
         User existUser = handleGetUserById(id);
+
         if (existUser == null)
             throw new IdInvalidException("User với id:  " + id + " không tồn tại !!!!!");
+        
+        watchHistoryService.handleDeleteAllWatchHistoryByUserId(id);
         userRepository.deleteById(id);
     }
 

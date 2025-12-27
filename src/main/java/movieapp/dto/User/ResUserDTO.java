@@ -1,4 +1,4 @@
-package movieapp.dto.User.Response;
+package movieapp.dto.User;
 
 import lombok.*;
 

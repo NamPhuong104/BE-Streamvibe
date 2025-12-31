@@ -30,10 +30,16 @@ public class PlaylistController {
         return ResponseEntity.status(200).body(playlistService.handleGetPlaylistByMe(page));
     }
 
-    @DeleteMapping("/me")
-    @ApiMessage("Delete All Playlist By Me")
-    public ResponseEntity<Void> deleteAllPlaylistByMe() throws IdInvalidException {
-        playlistService.handleDeleteAllPlaylistByMe();
+    @PostMapping("/me")
+    @ApiMessage("Create Playlist By Me")
+    public PlaylistResponse createPlaylistByMe(@Valid @RequestBody PlaylistCreateDTO dto) throws IdInvalidException {
+        return playlistService.handleCreatePlaylistByMe(dto);
+    }
+
+    @DeleteMapping("/me/{id}")
+    @ApiMessage("Delete Playlist By Me")
+    public ResponseEntity<Void> deletePlaylistByMe(@PathVariable("id") Long id) throws IdInvalidException {
+        playlistService.handleDeletePlaylistByMe(id);
         return ResponseEntity.ok(null);
     }
 

@@ -3,7 +3,6 @@ package movieapp.domain;
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.cglib.core.Local;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -24,9 +23,9 @@ public class Playlist {
     @JoinColumn(name = "user_id", nullable = false)
     private User user;
 
-//    @OneToMany(mappedBy = "playlist", cascade = CascadeType.ALL, orphanRemoval = true)
-//    @JsonIgnore
-//    private List<PlaylistMovie> playlistMovies;
+    @OneToMany(mappedBy = "playlist", cascade = CascadeType.ALL, orphanRemoval = true)
+    @JsonIgnore
+    private List<PlaylistMovie> playlistMovies;
 
     @Column(name = "name", nullable = false)
     private String name;

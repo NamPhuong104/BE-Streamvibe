@@ -15,6 +15,8 @@ public interface PlaylistRepository extends JpaRepository<Playlist, Long>, JpaSp
     Page<Playlist> findByUserIdOrderByCreatedAtDesc(Long userId, Pageable pageable);
 
     @Modifying
-    @Query("DELETE FROM Playlist pl WHERE pl.user.id = :userId")
-    void deleteAllHistoryByUserId(@Param("userId") Long userId);
+    @Query("DELETE FROM Playlist pl WHERE pl.user.id = :userId AND pl.id = :playlistId")
+    void deletePlaylistByUserIdAndPlaylistId(@Param("userId") Long userId, @Param("playlistId") Long playlistId);
+
+    long countByUserId(Long userId);
 }

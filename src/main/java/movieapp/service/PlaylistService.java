@@ -2,14 +2,15 @@ package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
 import movieapp.domain.Playlist;
+import movieapp.domain.PlaylistMovie;
 import movieapp.domain.User;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.Playlist.PlayListUpdateDTO;
 import movieapp.dto.Playlist.PlaylistCreateDTO;
 import movieapp.dto.Playlist.PlaylistResponse;
+import movieapp.repository.PlaylistMovieRepository;
 import movieapp.repository.PlaylistRepository;
 import movieapp.repository.UserRepository;
-import movieapp.util.SecurityUtil;
 import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
@@ -28,11 +29,14 @@ public class PlaylistService {
     private final PlaylistRepository playlistRepository;
     private final UserService userService;
     private final UserRepository userRepository;
+    private final PlaylistMovieRepository playlistMovieRepository;
+
+    private static final int MAX_PLAYLISTS_PER_USER = 10;
 
     //  CLIENT
     public ResultPaginationDTO handleGetPlaylistByMe(Pageable pageable) throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user với email: " + email));
+
+        User currentUser = userService.getCurrentUser();
 
         Page<Playlist> pagePl = playlistRepository.findByUserIdOrderByCreatedAtDesc(currentUser.getId(), pageable);
 
@@ -51,14 +55,29 @@ public class PlaylistService {
 
         return rs;
     }
-    
+
+    public PlaylistResponse handleCreatePlaylistByMe(PlaylistCreateDTO data) throws IdInvalidException {
+        User currentUser = userService.getCurrentUser();
+
+        long currentCount = playlistRepository.countByUserId(currentUser.getId());
+
+        if (currentCount >= MAX_PLAYLISTS_PER_USER)
+            throw new IdInvalidException("Bạn chỉ có thể tạo tối đa " + MAX_PLAYLISTS_PER_USER + " playlist");
+        return handleCreatePlaylist(data);
+    }
+
 
     @Transactional
-    public void handleDeleteAllPlaylistByMe() throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user"));
+    public void handleDeletePlaylistByMe(Long id) throws IdInvalidException {
+        User currentUser = userService.getCurrentUser();
 
-        playlistRepository.deleteAllHistoryByUserId(currentUser.getId());
+        PlaylistResponse pl = handleGetPlaylistById(id);
+
+        if (pl != null) {
+            playlistMovieRepository.deleteAllMovieByPlaylistIdAndUserId(id, currentUser.getId());
+            playlistRepository.deletePlaylistByUserIdAndPlaylistId(currentUser.getId(), id);
+        }
+
     }
 
     //  ADMIN

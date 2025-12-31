@@ -7,6 +7,7 @@ import movieapp.dto.User.UseCreateDTO;
 import movieapp.dto.User.UserUpdateDTO;
 import movieapp.dto.User.ResUserDTO;
 import movieapp.repository.UserRepository;
+import movieapp.util.SecurityUtil;
 import movieapp.util.Util;
 import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
@@ -182,7 +183,7 @@ public class UserService {
 
         if (existUser == null)
             throw new IdInvalidException("User với id:  " + id + " không tồn tại !!!!!");
-        
+
         watchHistoryService.handleDeleteAllWatchHistoryByUserId(id);
         userRepository.deleteById(id);
     }
@@ -286,5 +287,14 @@ public class UserService {
         user.setIsEmailVerified(true);
 
         userRepository.save(user);
+    }
+
+    //    HELPER METHOD
+    public User getCurrentUser() throws IdInvalidException {
+        String email = SecurityUtil.getCurrentUserLogin()
+                .orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
+
+        return userRepository.findByEmail(email)
+                .orElseThrow(() -> new IdInvalidException("Không tìm thấy user"));
     }
 }

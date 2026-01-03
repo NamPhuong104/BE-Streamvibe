@@ -19,7 +19,7 @@ public class UserDetailsCustom implements UserDetailsService {
     @Override
     public UserDetails loadUserByUsername(String username) throws UsernameNotFoundException {
         // 1. Gọi Service tìm user trong DB (username ở đây chính là email)
-        movieapp.domain.User user = userService.handleFindUserByEmailEntity(username);
+        movieapp.entity.User user = userService.handleFindUserByEmailEntity(username);
 
         if (user == null) throw new UsernameNotFoundException("User không tồn tại");
 

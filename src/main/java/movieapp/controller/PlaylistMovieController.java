@@ -8,14 +8,12 @@ import movieapp.dto.PlaylistMovie.PlaylistMovieCreateDTO;
 import movieapp.dto.PlaylistMovie.PlaylistMovieRes;
 import movieapp.service.PlaylistMovieService;
 import movieapp.util.annotation.ApiMessage;
-import movieapp.util.error.IdInvalidException;
+import movieapp.exception.CommonMessageException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
-
-import java.util.List;
 
 
 @RestController
@@ -26,25 +24,25 @@ public class PlaylistMovieController {
 
     @GetMapping("/me")
     @ApiMessage("Get Playlist Movie By Me")
-    public ResultPaginationDTO getMovieByMe(Pageable pageable) throws IdInvalidException {
+    public ResultPaginationDTO getMovieByMe(Pageable pageable) {
         return playlistMovieService.handleGetPlaylistByMe(pageable);
     }
 
     @GetMapping("/me/check/{movieSlug}")
     @ApiMessage("Check Playlist Movie In Playlist")
-    public Long checkMovieInMyPlaylist(@PathVariable String movieSlug) throws IdInvalidException {
+    public Long checkMovieInMyPlaylist(@PathVariable String movieSlug) {
         return playlistMovieService.handleCheckMovieInMyPlaylist(movieSlug);
     }
 
     @GetMapping("/me/{playlistId}")
     @ApiMessage("Get Playlist Movie In My Playlist")
-    public ResultPaginationDTO getMovieInMyPlaylist(@PathVariable Long playlistId, Pageable pageable) throws IdInvalidException {
+    public ResultPaginationDTO getMovieInMyPlaylist(@PathVariable Long playlistId, Pageable pageable) {
         return playlistMovieService.handleGetMovieInMyPlaylist(playlistId, pageable);
     }
 
     @PostMapping("/me")
     @ApiMessage("Create Movie In My Playlist")
-    public ResponseEntity<PlaylistMovieRes> createMovieInPlaylist(@Valid @RequestBody PlaylistMovieCreateDTO dto) throws IdInvalidException {
+    public ResponseEntity<PlaylistMovieRes> createMovieInPlaylist(@Valid @RequestBody PlaylistMovieCreateDTO dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(playlistMovieService.handleCreateMovieByMe(dto));
     }
 

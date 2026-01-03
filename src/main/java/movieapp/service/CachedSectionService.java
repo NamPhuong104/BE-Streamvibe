@@ -1,7 +1,6 @@
 package movieapp.service;
 
 import lombok.extern.slf4j.Slf4j;
-import movieapp.client.OphimClient;
 import movieapp.dto.HomepageReponse.HomepageResponse;
 import movieapp.dto.OphimResponse.OphimHomepageResponse;
 import movieapp.dto.OphimResponse.OphimListResponse;
@@ -21,11 +20,11 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class CachedSectionService {
-    private final OphimClient ophimClient;
+    private final OPhimClientService ophimClient;
     private final ImageOptimizationService imageService;
     private final ExecutorService executorService;
 
-    public CachedSectionService(OphimClient ophimClient, ImageOptimizationService imageService, @Qualifier("taskExecutor") ExecutorService executorService) {
+    public CachedSectionService(OPhimClientService ophimClient, ImageOptimizationService imageService, @Qualifier("taskExecutor") ExecutorService executorService) {
         this.ophimClient = ophimClient;
         this.imageService = imageService;
         this.executorService = executorService;

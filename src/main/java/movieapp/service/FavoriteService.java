@@ -2,21 +2,20 @@ package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import movieapp.client.OphimClient;
-import movieapp.domain.Favorite;
-import movieapp.domain.OptimizedImage;
-import movieapp.domain.User;
+import movieapp.entity.Favorite;
+import movieapp.entity.OptimizedImage;
+import movieapp.entity.User;
 import movieapp.dto.Favorites.FavoriteCreateReq;
 import movieapp.dto.Favorites.FavoriteRes;
 import movieapp.dto.Favorites.FavoriteUpdateReq;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.OphimResponse.OphimMovieDetail;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
+import movieapp.exception.CommonMessageException;
 import movieapp.repository.FavoriteRepository;
 import movieapp.repository.OptimizedImageRepository;
 import movieapp.repository.UserRepository;
 import movieapp.util.SecurityUtil;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -25,23 +24,22 @@ import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 @Slf4j
 public class FavoriteService {
-    private final FavoriteRepository favoriteRepository;
-    private final UserRepository userRepository;
-    private final OphimClient ophimClient;
-    private final OptimizedImageRepository optimizedImageRepository;
-    private final ImageOptimizationService imageOptimizationService;
     private static final String IMAGE_TYPE_THUMB = "thumb";
     private static final String IMAGE_TYPE_POSTER = "poster";
+    private final FavoriteRepository favoriteRepository;
+    private final UserRepository userRepository;
+    private final OPhimClientService ophimClient;
+    private final OptimizedImageRepository optimizedImageRepository;
+    private final ImageOptimizationService imageOptimizationService;
 
-    public User getUserById(Long id) throws IdInvalidException {
-        return userRepository.findById(id).orElseThrow(() -> new IdInvalidException("User không tồn tại với id: " + id));
+    public User getUserById(Long id) {
+        return userRepository.findById(id).orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + id));
     }
 
     public boolean handleCheckIsFavorite(String movieSlug) {
@@ -75,9 +73,9 @@ public class FavoriteService {
         return rs;
     }
 
-    public ResultPaginationDTO handleGetFavoriteByMe(Pageable pageable) throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User curentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user với email: " + email));
+    public ResultPaginationDTO handleGetFavoriteByMe(Pageable pageable) {
+        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
+        User curentUser = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("Không tìm thấy user với email: " + email));
 
         Page<Favorite> pageFavorite = favoriteRepository.findByUserIdOrderByCreatedAtDesc(curentUser.getId(), pageable);
 
@@ -101,25 +99,25 @@ public class FavoriteService {
     }
 
     @Transactional
-    public void handleDeleteByMovieSlug(String movieSlug) throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User curentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user với email: " + email));
+    public void handleDeleteByMovieSlug(String movieSlug) {
+        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
+        User curentUser = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("Không tìm thấy user với email: " + email));
         if (!favoriteRepository.existsByUserAndMovieSlug(curentUser, movieSlug))
-            throw new IdInvalidException("Phim không có trong danh sách yêu thích");
+            throw new CommonMessageException("Phim không có trong danh sách yêu thích");
 
         favoriteRepository.deleteByUserAndMovieSlug(curentUser, movieSlug);
     }
 
-    public FavoriteRes handleGetFavoriteById(long id) throws IdInvalidException {
-        Favorite res = favoriteRepository.findById(id).orElseThrow(() -> new IdInvalidException("Favorite ko tồn tại với id " + id));
+    public FavoriteRes handleGetFavoriteById(long id) {
+        Favorite res = favoriteRepository.findById(id).orElseThrow(() -> new CommonMessageException("Favorite ko tồn tại với id " + id));
         Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(List.of(res.getMovieSlug()));
         return convertFavoriteRes(res, imageMap);
     }
 
-    public FavoriteRes handleCreateFavorite(FavoriteCreateReq dto) throws IdInvalidException {
+    public FavoriteRes handleCreateFavorite(FavoriteCreateReq dto) {
         User user = getUserById(dto.getUserId());
         if (favoriteRepository.existsByUserAndMovieSlug(user, dto.getMovieSlug()))
-            throw new IdInvalidException("Phim đã có trong danh sách");
+            throw new CommonMessageException("Phim đã có trong danh sách");
 
         Favorite fav = new Favorite();
         fav.setUser(user);
@@ -149,8 +147,8 @@ public class FavoriteService {
                 log.warn("Không lấy được poster mới từ Ophim cho slug {}: {}", fav.getMovieSlug(), e.getMessage());
             }
         }
-        String posterUrl = poster != null ? poster : null;
-        String thumbUrl = thumb != null ? thumb : null;
+        String posterUrl = poster;
+        String thumbUrl = thumb;
 
         fav.setPosterUrl(posterUrl);
         fav.setThumbUrl(thumbUrl);
@@ -160,8 +158,8 @@ public class FavoriteService {
         return convertFavoriteRes(fav, imageMap);
     }
 
-    public FavoriteRes handleUpdateFavorite(FavoriteUpdateReq dto) throws IdInvalidException {
-        Favorite fav = favoriteRepository.findById(dto.getId()).orElseThrow(() -> new IdInvalidException("Favorite ko tồn tại với id " + dto.getId()));
+    public FavoriteRes handleUpdateFavorite(FavoriteUpdateReq dto) {
+        Favorite fav = favoriteRepository.findById(dto.getId()).orElseThrow(() -> new CommonMessageException("Favorite ko tồn tại với id " + dto.getId()));
 
         if (dto.getUserId() != null) {
             User user = getUserById(dto.getUserId());
@@ -183,8 +181,8 @@ public class FavoriteService {
         return convertFavoriteRes(fav, imageMap);
     }
 
-    public void handleDeleteFavorite(long id) throws IdInvalidException {
-        favoriteRepository.findById(id).orElseThrow(() -> new IdInvalidException("Favorite không tồn tại với id: " + id));
+    public void handleDeleteFavorite(long id) {
+        favoriteRepository.findById(id).orElseThrow(() -> new CommonMessageException("Favorite không tồn tại với id: " + id));
         favoriteRepository.deleteById(id);
     }
 

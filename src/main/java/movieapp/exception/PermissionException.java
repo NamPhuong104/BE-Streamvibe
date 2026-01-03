@@ -1,4 +1,4 @@
-package movieapp.util.error;
+package movieapp.exception;
 
 public class PermissionException extends Exception {
     public PermissionException(String message) {

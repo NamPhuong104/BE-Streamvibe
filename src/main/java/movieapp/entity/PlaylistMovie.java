@@ -1,4 +1,4 @@
-package movieapp.domain;
+package movieapp.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -13,6 +13,15 @@ import java.time.LocalDateTime;
                         name = "uk_playlist_movie",
                         columnNames = {"playlist_id", "movie_slug"}
                 )
+        },
+        indexes = {
+                // Composite Index cho phân trang movies trong playlist
+                // Query: findByPlaylistIdOrderByAddedAtDesc
+                @Index(name = "idx_playlist_movie_playlist_added", columnList = "playlist_id, added_at DESC"),
+
+                // Single Index cho movie_slug
+                // Query: findByUserIdAndMovieSlug (JOIN với playlist)
+                @Index(name = "idx_playlist_movie_slug", columnList = "movie_slug")
         }
 )
 @Getter

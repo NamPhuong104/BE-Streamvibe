@@ -3,14 +3,13 @@ package movieapp.controller;
 import com.turkraft.springfilter.boot.Filter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import movieapp.domain.Favorite;
+import movieapp.entity.Favorite;
 import movieapp.dto.Favorites.FavoriteCreateReq;
 import movieapp.dto.Favorites.FavoriteRes;
 import movieapp.dto.Favorites.FavoriteUpdateReq;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.service.FavoriteService;
 import movieapp.util.annotation.ApiMessage;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -32,7 +31,7 @@ public class FavoriteController {
 
     @GetMapping("/me")
     @ApiMessage("Get Favorite By Me")
-    public ResponseEntity<ResultPaginationDTO> getFavoriteByMe(Pageable pageable) throws IdInvalidException {
+    public ResponseEntity<ResultPaginationDTO> getFavoriteByMe(Pageable pageable) {
         return ResponseEntity.status(HttpStatus.OK).body(favoriteService.handleGetFavoriteByMe(pageable));
     }
 
@@ -44,33 +43,33 @@ public class FavoriteController {
 
     @DeleteMapping("/me/{movieSlug}")
     @ApiMessage("Delete By Movie Slug")
-    public ResponseEntity<Void> deleteBySlug(@PathVariable String movieSlug) throws IdInvalidException {
+    public ResponseEntity<Void> deleteBySlug(@PathVariable String movieSlug) {
         favoriteService.handleDeleteByMovieSlug(movieSlug);
         return ResponseEntity.ok(null);
     }
 
     @GetMapping("/{id}")
     @ApiMessage("Get Favorite By Id")
-    public ResponseEntity<FavoriteRes> getFavoriteById(@PathVariable("id") long id) throws IdInvalidException {
+    public ResponseEntity<FavoriteRes> getFavoriteById(@PathVariable("id") long id) {
         return ResponseEntity.ok(favoriteService.handleGetFavoriteById(id));
     }
 
 
     @PostMapping
     @ApiMessage("Create Favorite")
-    public ResponseEntity<FavoriteRes> createFavorite(@Valid @RequestBody FavoriteCreateReq dto) throws IdInvalidException {
+    public ResponseEntity<FavoriteRes> createFavorite(@Valid @RequestBody FavoriteCreateReq dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(favoriteService.handleCreateFavorite(dto));
     }
 
     @PatchMapping
     @ApiMessage("Update Favorite")
-    public ResponseEntity<FavoriteRes> updateFavorite(@RequestBody FavoriteUpdateReq dto) throws IdInvalidException {
+    public ResponseEntity<FavoriteRes> updateFavorite(@RequestBody FavoriteUpdateReq dto) {
         return ResponseEntity.ok().body(favoriteService.handleUpdateFavorite(dto));
     }
 
     @DeleteMapping("/{id}")
     @ApiMessage("Delete Favorite")
-    public ResponseEntity<Void> deleteFavorite(@PathVariable("id") Long id) throws IdInvalidException {
+    public ResponseEntity<Void> deleteFavorite(@PathVariable("id") Long id) {
         favoriteService.handleDeleteFavorite(id);
         return ResponseEntity.ok(null);
     }

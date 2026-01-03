@@ -1,10 +1,8 @@
-package movieapp.domain;
+package movieapp.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
-import org.springframework.cglib.core.Local;
 
-import java.time.LocalDate;
 import java.time.LocalDateTime;
 
 @Entity
@@ -15,6 +13,19 @@ import java.time.LocalDateTime;
                         name = "uk_user_movie_episode",
                         columnNames = {"user_id", "movie_slug", "episode_slug"}
                 )
+        },
+        indexes = {
+                // 1. Composite Index cho phân trang lịch sử xem
+                // Query: findByUserIdOrderByLastWatchedAtDesc
+                @Index(name = "idx_watch_history_user_watched", columnList = "user_id, last_watched_at DESC"),
+
+                // 2. Composite Index cho query theo movie
+                // Query: findLastedByUserAndMovie, existsByUserIdAndMovieSlug
+                @Index(name = "idx_watch_history_user_movie", columnList = "user_id, movie_slug, last_watched_at DESC"),
+
+                // 3. Composite Index cho "Tiếp tục xem"
+                // Query: findByUserIdAndCompletedFalseOrderByLastWatchedAtDesc
+                @Index(name = "idx_watch_history_user_completed", columnList = "user_id, completed, last_watched_at DESC")
         }
 )
 @Getter

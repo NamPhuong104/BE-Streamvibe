@@ -1,0 +1,113 @@
+# ===================================
+# APPLICATION - COMMON CONFIG
+# ===================================
+spring:
+  application:
+    name: Streamvibe Movie App
+
+  # ===================================
+  # PROFILES
+  # ===================================
+  profiles:
+    active: local
+
+  # ===================================
+  # JPA / HIBERNATE
+  # ===================================
+  jpa:
+    database: POSTGRESQL
+    hibernate:
+      ddl-auto: update
+    properties:
+      hibernate:
+        dialect: org.hibernate.dialect.PostgreSQLDialect
+        format_sql: false
+        types:
+          print:
+            banner: false
+
+  # ===================================
+  # DATASOURCE COMMON
+  # ===================================
+  datasource:
+    driver-class-name: org.postgresql.Driver
+
+  # ===================================
+  # CACHE CONFIG
+  # ===================================
+  cache:
+    type: redis
+
+  # ===================================
+  # CONFIG PAGE START = 1
+  # ===================================
+  data:
+    web:
+      pageable:
+        one-indexed-parameters: true
+
+  # ===================================
+  # CONFIG EMAIL WITH GOOGLE
+  # ===================================
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+
+  # ===================================
+  # CONFIG UPLOAD FILE (Optional)
+  # ===================================
+  # servlet:
+  #   multipart:
+  #     max-file-size: 50MB
+  #     max-request-size: 50MB
+
+# ===================================
+# OPHIM
+# ===================================
+ophim:
+  baseurl: https://ophim1.com/v1/api
+  full-url-image: https://img.ophim.live/uploads/movies
+
+# ===================================
+# JWT CONFIG
+# ===================================
+jwt:
+  # Access Token: 1 day (86400 seconds)
+  access-token-validity-in-seconds: 86400
+  # Refresh Token: 30 days (2592000 seconds)
+  refresh-token-validity-in-seconds: 2592000
+
+# ===================================
+# APP CONFIGURATION
+# ===================================
+app:
+  image:
+    enable-cloudinary: true
+
+  # ===================================
+  # CACHE CONFIGURATION
+  # ===================================
+  cache:
+    ttl-minutes: 60
+    warmup-delay-seconds: 10
+    detail-fetch-threads: 10
+    api-timeout-seconds: 10
+    schedule:
+      enabled: true
+      initial-group: "0 54 * * * *"
+      group1: "0 55 * * * *"
+      group2: "0 56 * * * *"
+
+# ===================================
+# LOGGING (Default)
+# ===================================
+logging:
+  level:
+    org.springframework: INFO
+    com.movieapp: INFO

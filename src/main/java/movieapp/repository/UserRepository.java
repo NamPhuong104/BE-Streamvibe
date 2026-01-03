@@ -1,9 +1,12 @@
 package movieapp.repository;
 
-import movieapp.domain.User;
+import movieapp.entity.User;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
+import org.springframework.data.jpa.repository.Modifying;
+import org.springframework.data.jpa.repository.Query;
 import org.springframework.stereotype.Repository;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.Optional;
 
@@ -22,4 +25,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     Optional<User> findByVerifyEmailToken(String token);
 
     Optional<User> findByChangeEmailToken(String token);
+
+    @Modifying
+    @Transactional
+    @Query(
+            nativeQuery = true,
+            value = "UPDATE users SET refresh_token = :refreshToken WHERE email = :email"
+    )
+    void updateRefreshTokenByEmail(String refreshToken, String email);
 }

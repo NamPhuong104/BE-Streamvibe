@@ -1,4 +1,4 @@
-package movieapp.domain;
+package movieapp.entity;
 
 import jakarta.persistence.*;
 import lombok.AllArgsConstructor;
@@ -15,7 +15,12 @@ import java.time.LocalDateTime;
                 columnNames = {"slug", "image_type"}
         ),
 },
-        indexes = {@Index(name = "idx_slug", columnList = "slug")}
+        indexes = {
+                // Index cho slug (không unique vì có thể cùng slug khác image_type)
+                // Nhưng uk_slug_image_type đã cover các query theo slug
+                // Nếu có query chỉ theo slug thì mới cần index này
+                @Index(name = "idx_optimized_image_slug", columnList = "slug")
+        }
 )
 @Data
 @Builder

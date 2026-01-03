@@ -1,17 +1,17 @@
 package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
-import movieapp.domain.OptimizedImage;
-import movieapp.domain.Playlist;
-import movieapp.domain.PlaylistMovie;
-import movieapp.domain.User;
+import movieapp.entity.OptimizedImage;
+import movieapp.entity.Playlist;
+import movieapp.entity.PlaylistMovie;
+import movieapp.entity.User;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.PlaylistMovie.PlaylistMovieCreateDTO;
 import movieapp.dto.PlaylistMovie.PlaylistMovieRes;
+import movieapp.exception.CommonMessageException;
 import movieapp.repository.OptimizedImageRepository;
 import movieapp.repository.PlaylistMovieRepository;
 import movieapp.repository.PlaylistRepository;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -26,15 +26,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlaylistMovieService {
+    private static final String IMAGE_TYPE_THUMB = "thumb";
+    private static final String IMAGE_TYPE_POSTER = "poster";
     private final PlaylistMovieRepository playlistMovieRepository;
     private final PlaylistRepository playlistRepository;
     private final OptimizedImageRepository optimizedImageRepository;
     private final UserService userService;
 
-    private static final String IMAGE_TYPE_THUMB = "thumb";
-    private static final String IMAGE_TYPE_POSTER = "poster";
-
-    public ResultPaginationDTO handleGetMovieInMyPlaylist(Long playlistId, Pageable pageable) throws IdInvalidException {
+    public ResultPaginationDTO handleGetMovieInMyPlaylist(Long playlistId, Pageable pageable) {
         User currentUser = userService.getCurrentUser();
 
         Page<PlaylistMovie> pagePm = playlistMovieRepository.findLastedByPlaylistIdAndUserId(currentUser.getId(), playlistId, pageable);
@@ -59,7 +58,7 @@ public class PlaylistMovieService {
         return rs;
     }
 
-    public ResultPaginationDTO handleGetPlaylistByMe(Pageable pageable) throws IdInvalidException {
+    public ResultPaginationDTO handleGetPlaylistByMe(Pageable pageable) {
         User currentUser = userService.getCurrentUser();
 
         Page<PlaylistMovie> pagePm = playlistMovieRepository.findLastedByUser(currentUser.getId(), pageable);
@@ -108,15 +107,15 @@ public class PlaylistMovieService {
     }
 
     @Transactional
-    public PlaylistMovieRes handleCreateMovieByMe(PlaylistMovieCreateDTO data) throws IdInvalidException {
+    public PlaylistMovieRes handleCreateMovieByMe(PlaylistMovieCreateDTO data) {
         User currentUser = userService.getCurrentUser();
 
         Playlist newPlaylist = playlistRepository.findById(data.getPlaylistId())
-                .orElseThrow(() -> new IdInvalidException("Playlist không tồn tại với id: " + data.getPlaylistId()));
+                .orElseThrow(() -> new CommonMessageException("Playlist không tồn tại với id: " + data.getPlaylistId()));
 
         // Check playlist có thuộc về user không
         if (!newPlaylist.getUser().getId().equals(currentUser.getId())) {
-            throw new IdInvalidException("Bạn không có quyền thêm vào playlist này");
+            throw new CommonMessageException("Bạn không có quyền thêm vào playlist này");
         }
 
         // ⭐ Check phim đã có trong playlist nào chưa
@@ -129,7 +128,7 @@ public class PlaylistMovieService {
 
             // Nếu đã có trong cùng playlist → không làm gì
             if (oldPlaylist.getId() == newPlaylist.getId()) {
-                throw new IdInvalidException("Phim đã có trong playlist này");
+                throw new CommonMessageException("Phim đã có trong playlist này");
             }
 
             // ⭐ Xóa khỏi playlist cũ
@@ -150,7 +149,7 @@ public class PlaylistMovieService {
         return convertToPlaylistMovieRes(pm, imageMap);
     }
 
-    public Long handleCheckMovieInMyPlaylist(String movieSlug) throws IdInvalidException {
+    public Long handleCheckMovieInMyPlaylist(String movieSlug) {
         User currentUser = userService.getCurrentUser();
         return playlistMovieRepository.findPlaylistIdByUserIdAndMovieSlug(currentUser.getId(), movieSlug);
     }

@@ -3,14 +3,13 @@ package movieapp.controller;
 import com.turkraft.springfilter.boot.Filter;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
-import movieapp.domain.WatchHistory;
+import movieapp.entity.WatchHistory;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.WatchHistory.WatchHistoryCreateReq;
 import movieapp.dto.WatchHistory.WatchHistoryRes;
 import movieapp.dto.WatchHistory.WatchHistoryUpdateReq;
 import movieapp.service.WatchHistoryService;
 import movieapp.util.annotation.ApiMessage;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
@@ -25,7 +24,7 @@ public class WatchHistoryController {
 
     @GetMapping("/me")
     @ApiMessage("Get watch history by me")
-    public ResponseEntity<ResultPaginationDTO> getWatchHistoryByMe(Pageable pageable) throws IdInvalidException {
+    public ResponseEntity<ResultPaginationDTO> getWatchHistoryByMe(Pageable pageable) {
         return ResponseEntity.status(200).body(watchHistoryService.handleGetWatchHistoryByMe(pageable));
     }
 
@@ -34,13 +33,13 @@ public class WatchHistoryController {
     public ResponseEntity<WatchHistoryRes> getWatchProgress(
             @PathVariable String movieSlug,
             @RequestParam(required = false) String episodeSlug
-    ) throws IdInvalidException {
+    ) {
         return ResponseEntity.ok(watchHistoryService.getWatchProgress(movieSlug, episodeSlug));
     }
 
     @DeleteMapping("/me/{movieSlug}")
     @ApiMessage("Delete Watch History By Movie Slug")
-    public ResponseEntity<Void> deleteWatchHistoryBySlug(@PathVariable String movieSlug) throws IdInvalidException {
+    public ResponseEntity<Void> deleteWatchHistoryBySlug(@PathVariable String movieSlug) {
         watchHistoryService.handleDeleteWatchHistoryBySlug(movieSlug);
         return ResponseEntity.ok().body(null);
     }
@@ -54,26 +53,26 @@ public class WatchHistoryController {
 
     @PostMapping
     @ApiMessage("Create watch history")
-    public ResponseEntity<WatchHistoryRes> createWatchHistory(@Valid @RequestBody WatchHistoryCreateReq dto) throws IdInvalidException {
+    public ResponseEntity<WatchHistoryRes> createWatchHistory(@Valid @RequestBody WatchHistoryCreateReq dto) {
         return ResponseEntity.status(HttpStatus.CREATED).body(watchHistoryService.handleCreateWatchHistory(dto));
     }
 
     @PutMapping
     @ApiMessage("Update Watch History")
-    public ResponseEntity<WatchHistoryRes> updateWatchHistory(@Valid @RequestBody WatchHistoryUpdateReq dto) throws IdInvalidException {
+    public ResponseEntity<WatchHistoryRes> updateWatchHistory(@Valid @RequestBody WatchHistoryUpdateReq dto) {
         return ResponseEntity.ok(watchHistoryService.handleUpdateWatchHistory(dto));
     }
 
     @DeleteMapping("/{id}")
     @ApiMessage("Delete Watch History")
-    public ResponseEntity<Void> deleteWatchHistory(@Valid @PathVariable("id") Long id) throws IdInvalidException {
+    public ResponseEntity<Void> deleteWatchHistory(@Valid @PathVariable("id") Long id) {
         watchHistoryService.handleDeleteWatchHistory(id);
         return ResponseEntity.ok(null);
     }
 
     @DeleteMapping("/user/{id}")
     @ApiMessage("Delete All Watch History By UserId")
-    public ResponseEntity<Void> deleteAllWatchHistoryByUserId(@Valid @PathVariable("id") Long id) throws IdInvalidException {
+    public ResponseEntity<Void> deleteAllWatchHistoryByUserId(@Valid @PathVariable("id") Long id) {
         watchHistoryService.handleDeleteAllWatchHistoryByUserId(id);
         return ResponseEntity.ok(null);
     }

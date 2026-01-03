@@ -1,7 +1,7 @@
 package movieapp.repository;
 
-import movieapp.domain.Favorite;
-import movieapp.domain.User;
+import movieapp.entity.Favorite;
+import movieapp.entity.User;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;

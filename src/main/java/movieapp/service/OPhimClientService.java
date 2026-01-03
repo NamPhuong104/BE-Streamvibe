@@ -1,4 +1,4 @@
-package movieapp.client;
+package movieapp.service;
 
 import lombok.extern.slf4j.Slf4j;
 import movieapp.dto.OphimResponse.OphimHomepageResponse;
@@ -12,13 +12,12 @@ import java.util.Map;
 
 @Component
 @Slf4j
-public class OphimClient {
+public class OPhimClientService {
+    private final RestTemplate restTemplate;
     @Value("${ophim.baseurl}")
     private String baseUrl;
 
-    private final RestTemplate restTemplate;
-
-    public OphimClient(RestTemplate restTemplate) {
+    public OPhimClientService(RestTemplate restTemplate) {
         this.restTemplate = restTemplate;
     }
 

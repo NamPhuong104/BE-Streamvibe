@@ -1,4 +1,4 @@
-package movieapp.domain;
+package movieapp.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -8,7 +8,12 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "playlists")
+@Table(name = "playlists",
+        indexes = {
+                // Composite Index cho phân trang playlists của user
+                // Query: findByUserIdOrderByCreatedAtDesc, countByUserId
+                @Index(name = "idx_playlist_user_created", columnList = "user_id, created_at DESC")
+        })
 @Getter
 @Setter
 @NoArgsConstructor

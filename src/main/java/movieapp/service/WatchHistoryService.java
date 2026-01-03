@@ -1,19 +1,19 @@
 package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
-import movieapp.domain.OptimizedImage;
-import movieapp.domain.User;
-import movieapp.domain.WatchHistory;
+import movieapp.entity.OptimizedImage;
+import movieapp.entity.User;
+import movieapp.entity.WatchHistory;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.WatchHistory.WatchHistoryCreateReq;
 import movieapp.dto.WatchHistory.WatchHistoryRes;
 import movieapp.dto.WatchHistory.WatchHistoryUpdateReq;
+import movieapp.exception.CommonMessageException;
 import movieapp.repository.OptimizedImageRepository;
 import movieapp.repository.UserRepository;
 import movieapp.repository.WatchHistoryRepository;
 import movieapp.util.SecurityUtil;
 import movieapp.util.Util;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -28,14 +28,13 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WatchHistoryService {
+    private static final double COMPLETE_THRESHOLD = 95;
+    private static final String IMAGE_TYPE_THUMB = "thumb";
+    private static final String IMAGE_TYPE_POSTER = "poster";
     private final WatchHistoryRepository watchHistoryRepository;
     private final OptimizedImageRepository optimizedImageRepository;
     private final UserRepository userRepository;
     private final Util util;
-
-    private static final double COMPLETE_THRESHOLD = 95;
-    private static final String IMAGE_TYPE_THUMB = "thumb";
-    private static final String IMAGE_TYPE_POSTER = "poster";
 
     public ResultPaginationDTO handleGetAllWatchHistory(Specification<WatchHistory> spec, Pageable pageable) {
         Page<WatchHistory> pageHistory = watchHistoryRepository.findAll(spec, pageable);
@@ -69,9 +68,9 @@ public class WatchHistoryService {
     }
 
     //    * ⭐ Lấy lịch sử xem - MỖI PHIM CHỈ HIỆN 1 LẦN (tập mới nhất)
-    public ResultPaginationDTO handleGetWatchHistoryByMe(Pageable pageable) throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user với email: " + email));
+    public ResultPaginationDTO handleGetWatchHistoryByMe(Pageable pageable) {
+        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
+        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("Không tìm thấy user với email: " + email));
 
         int page = pageable.getPageNumber();
         int size = pageable.getPageSize();
@@ -107,9 +106,9 @@ public class WatchHistoryService {
      * - Nếu có episodeSlug → trả về progress của tập đó
      * - Nếu KHÔNG có episodeSlug → trả về record MỚI NHẤT (tập đang xem dở)
      */
-    public WatchHistoryRes getWatchProgress(String movieSlug, String episodeSlug) throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user"));
+    public WatchHistoryRes getWatchProgress(String movieSlug, String episodeSlug) {
+        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
+        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("Không tìm thấy user"));
 
         Optional<WatchHistory> historyOpt;
 
@@ -126,9 +125,9 @@ public class WatchHistoryService {
     }
 
     @Transactional
-    public void handleDeleteWatchHistoryBySlug(String slug) throws IdInvalidException {
-        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
-        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Không tìm thấy user"));
+    public void handleDeleteWatchHistoryBySlug(String slug) {
+        String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
+        User currentUser = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("Không tìm thấy user"));
 
         watchHistoryRepository.deleteHistoryByUserIdAndMovieSlug(currentUser.getId(), slug);
     }
@@ -156,9 +155,9 @@ public class WatchHistoryService {
                 ));
     }
 
-    public WatchHistoryRes handleCreateWatchHistory(WatchHistoryCreateReq dto) throws IdInvalidException {
+    public WatchHistoryRes handleCreateWatchHistory(WatchHistoryCreateReq dto) {
         User user = userRepository.findById(dto.getUserId())
-                .orElseThrow(() -> new IdInvalidException("User không tồn tại với id: " + dto.getUserId()));
+                .orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + dto.getUserId()));
 
         String episodeSlug = util.normalizeEpisode(dto.getEpisodeSlug());
         double progressPercent = util.calculateProgress(dto.getCurrentTime(), dto.getDuration());
@@ -193,13 +192,13 @@ public class WatchHistoryService {
         return convertToRes(history, imageMap);
     }
 
-    public WatchHistoryRes handleUpdateWatchHistory(WatchHistoryUpdateReq dto) throws IdInvalidException {
+    public WatchHistoryRes handleUpdateWatchHistory(WatchHistoryUpdateReq dto) {
         WatchHistory history = watchHistoryRepository.findById(dto.getId())
-                .orElseThrow(() -> new IdInvalidException("Lịch sử xem không tồn tại với id: " + dto.getId()));
+                .orElseThrow(() -> new CommonMessageException("Lịch sử xem không tồn tại với id: " + dto.getId()));
 
         if (dto.getUserId() != null) {
             User user = userRepository.findById(dto.getUserId())
-                    .orElseThrow(() -> new IdInvalidException("User không tồn tại với id: " + dto.getUserId()));
+                    .orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + dto.getUserId()));
             history.setUser(user);
         }
 
@@ -227,16 +226,16 @@ public class WatchHistoryService {
         return convertToRes(history, imageMap);
     }
 
-    public void handleDeleteWatchHistory(Long id) throws IdInvalidException {
+    public void handleDeleteWatchHistory(Long id) {
         if (!watchHistoryRepository.existsById(id))
-            throw new IdInvalidException("Watch History không tồn tại với id: " + id);
+            throw new CommonMessageException("Watch History không tồn tại với id: " + id);
         watchHistoryRepository.deleteById(id);
     }
 
     @Transactional
-    public void handleDeleteAllWatchHistoryByUserId(Long userId) throws IdInvalidException {
+    public void handleDeleteAllWatchHistoryByUserId(Long userId) {
         if (!watchHistoryRepository.existsByUserId(userId))
-            throw new IdInvalidException("Watch History không tồn tại với userId: " + userId);
+            throw new CommonMessageException("Watch History không tồn tại với userId: " + userId);
         watchHistoryRepository.deleteAllHistoryByUserId(userId);
     }
 

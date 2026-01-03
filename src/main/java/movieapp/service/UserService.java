@@ -1,22 +1,20 @@
 package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
-import movieapp.domain.User;
+import movieapp.entity.User;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
-import movieapp.dto.User.UseCreateDTO;
+import movieapp.dto.User.UserCreateDTO;
 import movieapp.dto.User.UserUpdateDTO;
 import movieapp.dto.User.ResUserDTO;
 import movieapp.repository.UserRepository;
 import movieapp.util.SecurityUtil;
 import movieapp.util.Util;
-import movieapp.util.error.IdInvalidException;
+import movieapp.exception.CommonMessageException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
-import org.springframework.http.HttpStatus;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
-import org.springframework.web.server.ResponseStatusException;
 
 import java.time.LocalDateTime;
 import java.util.List;
@@ -72,16 +70,14 @@ public class UserService {
         return userRepository.existsByEmail(email);
     }
 
-    public ResUserDTO handleFindUserByEmail(String email) throws IdInvalidException {
+    public ResUserDTO handleFindUserByEmail(String email) {
         User user = userRepository.findByEmail(email).orElseThrow(() -> new
-                IdInvalidException("Email " + email + " không tồn tại !!!"));
+                CommonMessageException("Email " + email + " không tồn tại !!!"));
         return convertToResUserDTO(user);
     }
 
     public User handleFindUserByEmailEntity(String email) {
-        Optional<User> currentUser = userRepository.findByEmail(email);
-        if (currentUser.isPresent()) return currentUser.get();
-        return null;
+        return userRepository.findByEmail(email).orElse(null);
     }
 
     public User getUserByRefreshTokenAndEmail(String token, String email) {
@@ -89,9 +85,7 @@ public class UserService {
     }
 
     public void handleUpdateUserToken(String refresh_token, String email) {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new ResponseStatusException(HttpStatus.OK));
-        user.setRefreshToken(refresh_token);
-        userRepository.save(user);
+        userRepository.updateRefreshTokenByEmail(refresh_token, email);
     }
 
     public User findOrCreateGoogleUser(String email, String name, String picture, String googleSub) {
@@ -119,11 +113,11 @@ public class UserService {
         }
     }
 
-    public void handleChangePassword(String email, String oldPassword, String newPassword) throws IdInvalidException {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("User với email " + email + " không tồn tại!"));
+    public void handleChangePassword(String email, String oldPassword, String newPassword) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("User với email " + email + " không tồn tại!"));
 
         if (!passwordEncoder.matches(oldPassword, user.getPassword())) {
-            throw new IdInvalidException("Mật khẩu cũ không chính xác");
+            throw new CommonMessageException("Mật khẩu cũ không chính xác");
         }
 
         String hashed = passwordEncoder.encode(newPassword);
@@ -131,10 +125,10 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public ResUserDTO handleCreateUser(UseCreateDTO userReq) throws IdInvalidException {
+    public ResUserDTO handleCreateUser(UserCreateDTO userReq) {
         boolean isEmailExist = isExistEmail(userReq.getEmail());
         if (isEmailExist)
-            throw new IdInvalidException("Email " + userReq.getEmail() + " đã tồn tại, vui lòng sử dụng email khác");
+            throw new CommonMessageException("Email " + userReq.getEmail() + " đã tồn tại, vui lòng sử dụng email khác");
 
         User newUser = new User();
         String hashPassword = passwordEncoder.encode(userReq.getPassword());
@@ -161,12 +155,12 @@ public class UserService {
         return convertToResUserDTO(newUser);
     }
 
-    public User handleGetUserById(long id) throws IdInvalidException {
-        User user = userRepository.findById(id).orElseThrow(() -> new IdInvalidException("User không tồn tại với id: " + id));
+    public User handleGetUserById(long id) {
+        User user = userRepository.findById(id).orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + id));
         return user;
     }
 
-    public ResUserDTO handleUpdateUser(long id, UserUpdateDTO userReq) throws IdInvalidException {
+    public ResUserDTO handleUpdateUser(long id, UserUpdateDTO userReq) {
         User existingUser = handleGetUserById(id);
 
         if (existingUser != null) {
@@ -178,18 +172,18 @@ public class UserService {
         return convertToResUserDTO(existingUser);
     }
 
-    public void handleDeleteUser(Long id) throws IdInvalidException {
+    public void handleDeleteUser(Long id) {
         User existUser = handleGetUserById(id);
 
         if (existUser == null)
-            throw new IdInvalidException("User với id:  " + id + " không tồn tại !!!!!");
+            throw new CommonMessageException("User với id:  " + id + " không tồn tại !!!!!");
 
         watchHistoryService.handleDeleteAllWatchHistoryByUserId(id);
         userRepository.deleteById(id);
     }
 
-    public void handleForgotPassword(String email) throws IdInvalidException {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("Email " + email + " không tồn tại!"));
+    public void handleForgotPassword(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("Email " + email + " không tồn tại!"));
 
         String tokenOtp = Util.generateOtp();
 
@@ -201,11 +195,11 @@ public class UserService {
         emailService.sendResetPasswordEmail(user.getEmail(), displayName, tokenOtp);
     }
 
-    public void handleResetPassword(String token, String newPassword) throws IdInvalidException {
-        User user = userRepository.findByResetPasswordToken(token).orElseThrow(() -> new IdInvalidException("Token reset password không hợp lệ"));
+    public void handleResetPassword(String token, String newPassword) {
+        User user = userRepository.findByResetPasswordToken(token).orElseThrow(() -> new CommonMessageException("Token reset password không hợp lệ"));
 
         if (user.getResetPasswordExpiry() == null || user.getResetPasswordExpiry().isBefore(LocalDateTime.now()))
-            throw new IdInvalidException("Token reset password đã hết hạn");
+            throw new CommonMessageException("Token reset password đã hết hạn");
 
         String hashed = passwordEncoder.encode(newPassword);
         user.setPassword(hashed);
@@ -215,10 +209,10 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public void handleVerifyEmail(String token) throws IdInvalidException {
-        User user = userRepository.findByVerifyEmailToken(token).orElseThrow(() -> new IdInvalidException("Token xác thực email không hợp lệ"));
+    public void handleVerifyEmail(String token) {
+        User user = userRepository.findByVerifyEmailToken(token).orElseThrow(() -> new CommonMessageException("Token xác thực email không hợp lệ"));
         if (user.getVerifyEmailExpiry() == null || user.getVerifyEmailExpiry().isBefore(LocalDateTime.now()))
-            throw new IdInvalidException("Token xác thực email đã hết hạn");
+            throw new CommonMessageException("Token xác thực email đã hết hạn");
 
         user.setIsEmailVerified(true);
         user.setVerifyEmailToken(null);
@@ -227,9 +221,9 @@ public class UserService {
         userRepository.save(user);
     }
 
-    public void handleResendVerifyEmail(String email) throws IdInvalidException {
-        User user = userRepository.findByEmail(email).orElseThrow(() -> new IdInvalidException("User với email " + email + " không tồn tại!"));
-        if (user.getIsEmailVerified() == true) throw new IdInvalidException("Tài khoản đã kích hoạt email");
+    public void handleResendVerifyEmail(String email) {
+        User user = userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("User với email " + email + " không tồn tại!"));
+        if (user.getIsEmailVerified() == true) throw new CommonMessageException("Tài khoản đã kích hoạt email");
 
         String tokenOtp = Util.generateOtp();
         user.setVerifyEmailToken(tokenOtp);
@@ -241,17 +235,18 @@ public class UserService {
         emailService.sendActiveEmail(email, displayName, tokenOtp);
     }
 
-    public void handleChangeEmail(String currentEmail, String newEmail, String currentPassword) throws IdInvalidException {
-        User user = userRepository.findByEmail(currentEmail).orElseThrow(() -> new IdInvalidException("User với email " + currentEmail + " không tồn tại!"));
+    public void handleChangeEmail(String currentEmail, String newEmail, String currentPassword) {
+        User user = userRepository.findByEmail(currentEmail).orElseThrow(() -> new CommonMessageException("User với email " + currentEmail + " không tồn tại!"));
 
         if (!"LOCAL".equalsIgnoreCase(user.getProvider()))
-            throw new IdInvalidException("Tài khoản đăng nhập bằng " + user.getProvider() + " không thể đổi email tại đây");
+            throw new CommonMessageException("Tài khoản đăng nhập bằng " + user.getProvider() + " không thể đổi email tại đây");
 
         if (!passwordEncoder.matches(currentPassword, user.getPassword()))
-            throw new IdInvalidException("Mật khẩu hiện tại không chính xác");
-        if (currentEmail.equalsIgnoreCase(newEmail)) throw new IdInvalidException("Email mới phải khác email hiện tại");
+            throw new CommonMessageException("Mật khẩu hiện tại không chính xác");
+        if (currentEmail.equalsIgnoreCase(newEmail))
+            throw new CommonMessageException("Email mới phải khác email hiện tại");
         if (userRepository.existsByEmail(newEmail))
-            throw new IdInvalidException("Email " + newEmail + " đã tồn tại, vui lòng dùng email khác");
+            throw new CommonMessageException("Email " + newEmail + " đã tồn tại, vui lòng dùng email khác");
 
         String tokenOtp = Util.generateOtp();
         user.setPendingEmail(newEmail);
@@ -265,19 +260,19 @@ public class UserService {
         emailService.sendChangeEmail(newEmail, displayName, currentEmail, newEmail, tokenOtp);
     }
 
-    public void handleConfirmChangeEmail(String token) throws IdInvalidException {
-        User user = userRepository.findByChangeEmailToken(token).orElseThrow(() -> new IdInvalidException("Token đổi email không hợp lệ"));
+    public void handleConfirmChangeEmail(String token) {
+        User user = userRepository.findByChangeEmailToken(token).orElseThrow(() -> new CommonMessageException("Token đổi email không hợp lệ"));
 
         if (user.getChangeEmailExpiry() == null || user.getChangeEmailExpiry().isBefore(LocalDateTime.now()))
-            throw new IdInvalidException("Token đổi email đã hết hạn");
+            throw new CommonMessageException("Token đổi email đã hết hạn");
 
         if (user.getPendingEmail() == null || user.getPendingEmail().isBlank()) {
-            throw new IdInvalidException("Không tìm thấy email mới để cập nhật");
+            throw new CommonMessageException("Không tìm thấy email mới để cập nhật");
         }
 
         String newEmail = user.getPendingEmail();
         if (userRepository.existsByEmail(newEmail) && !newEmail.equalsIgnoreCase(user.getEmail())) {
-            throw new IdInvalidException("Email " + newEmail + " đã tồn tại, không thể đổi");
+            throw new CommonMessageException("Email " + newEmail + " đã tồn tại, không thể đổi");
         }
 
         user.setEmail(newEmail);
@@ -290,11 +285,11 @@ public class UserService {
     }
 
     //    HELPER METHOD
-    public User getCurrentUser() throws IdInvalidException {
+    public User getCurrentUser() {
         String email = SecurityUtil.getCurrentUserLogin()
-                .orElseThrow(() -> new IdInvalidException("Bạn chưa đăng nhập"));
+                .orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
 
         return userRepository.findByEmail(email)
-                .orElseThrow(() -> new IdInvalidException("Không tìm thấy user"));
+                .orElseThrow(() -> new CommonMessageException("Không tìm thấy user"));
     }
 }

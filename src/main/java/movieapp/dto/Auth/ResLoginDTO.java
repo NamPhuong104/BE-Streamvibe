@@ -1,10 +1,7 @@
 package movieapp.dto.Auth;
 
 import com.fasterxml.jackson.annotation.JsonProperty;
-import lombok.AllArgsConstructor;
-import lombok.Getter;
-import lombok.NoArgsConstructor;
-import lombok.Setter;
+import lombok.*;
 
 @Getter
 @Setter
@@ -17,6 +14,7 @@ public class ResLoginDTO {
     @Setter
     @AllArgsConstructor
     @NoArgsConstructor
+    @Builder
     public static class UserLogin {
         private Long id;
         private String email;

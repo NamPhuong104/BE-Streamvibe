@@ -1,14 +1,14 @@
 package movieapp.service;
 
 import lombok.extern.slf4j.Slf4j;
+import movieapp.dto.CustomFieldsResponse.MovieItemDTO;
 import movieapp.dto.HomepageReponse.HomepageGroupResponse;
 import movieapp.dto.HomepageReponse.HomepageResponse;
 import movieapp.dto.MetaAndHead.SeoOnPage;
 import movieapp.dto.OphimResponse.OphimHomepageResponse;
-import movieapp.dto.CustomFieldsResponse.MovieItemDTO;
 import org.springframework.stereotype.Service;
 
-import java.util.*;
+import java.util.List;
 
 @Service
 @Slf4j

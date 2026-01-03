@@ -1,0 +1,75 @@
+# ===================================
+# LOCAL DEVELOPMENT CONFIGURATION
+# ===================================
+
+spring:
+  # ===================================
+  # DATABASE - LOCAL POSTGRESQL
+  # ===================================
+  datasource:
+    url: jdbc:postgresql://localhost:5432/postgres
+    username: postgres
+    password: 123456
+    # hikari:
+    #   maximum-pool-size: 5
+    #   minimum-idle: 2
+    #   connection-timeout: 30000
+
+  jpa:
+    show-sql: true
+
+  # ===================================
+  # REDIS - LOCAL
+  # ===================================
+  data:
+    redis:
+      host: localhost
+      port: 6379
+      timeout: 5000
+
+  cache:
+    redis:
+      time-to-live: 3600000
+
+  # ===================================
+  # EMAIL - LOCAL
+  # ===================================
+  mail:
+    username: namphuongtest@gmail.com
+    password: njzd jrec qvau wvkh
+
+# ===================================
+# CLOUDINARY - LOCAL/DEV
+# ===================================
+cloudinary:
+  cloud-name: drgnfmh54
+  api-key: 665447716324619
+  api-secret: YTM2PB654mY52sNpi94jYv0n0R0
+
+# ===================================
+# JWT SECRET - LOCAL
+# ===================================
+jwt:
+  base64-secret: VG9pVGVuTGFQaHVvbmdEYW5nSG9jU3ByaW5nU2VjdXJpdHlWYVRvaUNhbk1vdENhaUtleVJhdExhRGFpMTIzNDU2Nzg5
+
+# ===================================
+# GOOGLE - LOCAL
+# ===================================
+google:
+  client-id: 959314408688-jvu23ua7f4ljpherafbf0mjm4m3l1spj.apps.googleusercontent.com
+
+# ===================================
+# APP CONFIG - LOCAL
+# ===================================
+app:
+  frontend-url: http://localhost:3000
+
+# ===================================
+# LOGGING - LOCAL (More verbose)
+# ===================================
+logging:
+  level:
+    org.springframework: INFO
+    com.movieapp: DEBUG
+    org.hibernate.SQL: DEBUG
+    # org.hibernate.type.descriptor.sql.BasicBinder: TRACE  # Show SQL params

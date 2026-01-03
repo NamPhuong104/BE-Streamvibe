@@ -1,4 +1,4 @@
-package movieapp.domain;
+package movieapp.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
 import jakarta.persistence.*;
@@ -8,7 +8,23 @@ import java.time.LocalDateTime;
 import java.util.List;
 
 @Entity
-@Table(name = "users")
+@Table(name = "users", indexes = {
+        // 1. Refresh Token - dùng cho refresh access token
+        // Query: findByRefreshTokenAndEmail
+        @Index(name = "idx_user_refresh_token", columnList = "refresh_token"),
+
+        // 2. Reset Password Token - dùng cho reset password flow
+        // Query: findByResetPasswordToken
+        @Index(name = "idx_user_reset_password_token", columnList = "reset_password_token"),
+
+        // 3. Verify Email Token - dùng cho xác thực email
+        // Query: findByVerifyEmailToken
+        @Index(name = "idx_user_verify_email_token", columnList = "verify_email_token"),
+
+        // 4. Change Email Token - dùng cho đổi email
+        // Query: findByChangeEmailToken
+        @Index(name = "idx_user_change_email_token", columnList = "change_email_token")
+})
 @Getter
 @Setter
 @NoArgsConstructor

@@ -3,14 +3,12 @@ package movieapp.service;
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import lombok.extern.slf4j.Slf4j;
-import movieapp.domain.OptimizedImage;
+import movieapp.entity.OptimizedImage;
 import movieapp.repository.OptimizedImageRepository;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
-import java.util.Optional;
 
 @Service
 @Slf4j

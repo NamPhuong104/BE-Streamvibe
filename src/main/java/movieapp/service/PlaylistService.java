@@ -1,24 +1,22 @@
 package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
-import movieapp.domain.Playlist;
-import movieapp.domain.PlaylistMovie;
-import movieapp.domain.User;
+import movieapp.entity.Playlist;
+import movieapp.entity.User;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.Playlist.PlayListUpdateDTO;
 import movieapp.dto.Playlist.PlaylistCreateDTO;
 import movieapp.dto.Playlist.PlaylistResponse;
+import movieapp.exception.CommonMessageException;
 import movieapp.repository.PlaylistMovieRepository;
 import movieapp.repository.PlaylistRepository;
 import movieapp.repository.UserRepository;
-import movieapp.util.error.IdInvalidException;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-import java.security.PublicKey;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.stream.Collectors;
@@ -26,15 +24,14 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlaylistService {
+    private static final int MAX_PLAYLISTS_PER_USER = 10;
     private final PlaylistRepository playlistRepository;
     private final UserService userService;
     private final UserRepository userRepository;
     private final PlaylistMovieRepository playlistMovieRepository;
 
-    private static final int MAX_PLAYLISTS_PER_USER = 10;
-
     //  CLIENT
-    public ResultPaginationDTO handleGetPlaylistByMe(Pageable pageable) throws IdInvalidException {
+    public ResultPaginationDTO handleGetPlaylistByMe(Pageable pageable) {
 
         User currentUser = userService.getCurrentUser();
 
@@ -56,19 +53,19 @@ public class PlaylistService {
         return rs;
     }
 
-    public PlaylistResponse handleCreatePlaylistByMe(PlaylistCreateDTO data) throws IdInvalidException {
+    public PlaylistResponse handleCreatePlaylistByMe(PlaylistCreateDTO data) {
         User currentUser = userService.getCurrentUser();
 
         long currentCount = playlistRepository.countByUserId(currentUser.getId());
 
         if (currentCount >= MAX_PLAYLISTS_PER_USER)
-            throw new IdInvalidException("Bạn chỉ có thể tạo tối đa " + MAX_PLAYLISTS_PER_USER + " playlist");
+            throw new CommonMessageException("Bạn chỉ có thể tạo tối đa " + MAX_PLAYLISTS_PER_USER + " playlist");
         return handleCreatePlaylist(data);
     }
 
 
     @Transactional
-    public void handleDeletePlaylistByMe(Long id) throws IdInvalidException {
+    public void handleDeletePlaylistByMe(Long id) {
         User currentUser = userService.getCurrentUser();
 
         PlaylistResponse pl = handleGetPlaylistById(id);
@@ -101,12 +98,12 @@ public class PlaylistService {
         return rs;
     }
 
-    public PlaylistResponse handleGetPlaylistById(Long id) throws IdInvalidException {
-        Playlist pl = playlistRepository.findById(id).orElseThrow(() -> new IdInvalidException("Playlist không tồn tại với id: " + id));
+    public PlaylistResponse handleGetPlaylistById(Long id) {
+        Playlist pl = playlistRepository.findById(id).orElseThrow(() -> new CommonMessageException("Playlist không tồn tại với id: " + id));
         return convertToRes(pl);
     }
 
-    public PlaylistResponse handleCreatePlaylist(PlaylistCreateDTO dto) throws IdInvalidException {
+    public PlaylistResponse handleCreatePlaylist(PlaylistCreateDTO dto) {
         User currentUser = userService.handleGetUserById(dto.getUserId());
 
         Playlist playlist = Playlist.builder().user(currentUser).name(dto.getName().trim()).movieCount(0).build();
@@ -116,10 +113,10 @@ public class PlaylistService {
         return convertToRes(playlist);
     }
 
-    public PlaylistResponse handleUpdatePlaylist(PlayListUpdateDTO dto) throws IdInvalidException {
-        User currentUser = userRepository.findById(dto.getUserId()).orElseThrow(() -> new IdInvalidException("User không tồn tại với id: " + dto.getUserId()));
+    public PlaylistResponse handleUpdatePlaylist(PlayListUpdateDTO dto) {
+        User currentUser = userRepository.findById(dto.getUserId()).orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + dto.getUserId()));
 
-        Playlist pl = playlistRepository.findById(dto.getId()).orElseThrow(() -> new IdInvalidException("Playlist không tồn tại với id: " + dto.getId()));
+        Playlist pl = playlistRepository.findById(dto.getId()).orElseThrow(() -> new CommonMessageException("Playlist không tồn tại với id: " + dto.getId()));
 
         if (dto.getName() != null) pl.setName(dto.getName());
         if (dto.getUserId() != null) pl.setUser(currentUser);
@@ -129,7 +126,7 @@ public class PlaylistService {
         return convertToRes(pl);
     }
 
-    public void handleDeletePlaylist(Long id) throws IdInvalidException {
+    public void handleDeletePlaylist(Long id) {
         PlaylistResponse pl = handleGetPlaylistById(id);
 
         if (pl != null) playlistRepository.deleteById(id);

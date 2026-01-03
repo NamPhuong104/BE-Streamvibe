@@ -1,11 +1,11 @@
-package movieapp.util.error;
+package movieapp.controller.exceptionHandler;
 
 import movieapp.dto.RestResponse;
+import movieapp.exception.CommonMessageException;
+import movieapp.exception.PermissionException;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
-import org.springframework.security.authentication.BadCredentialsException;
-import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.validation.BindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
@@ -19,9 +19,9 @@ import java.util.stream.Collectors;
 
 @RestControllerAdvice
 public class GlobalExceptionHandler {
-    @ExceptionHandler(Exception.class)
+    @ExceptionHandler(value = {Exception.class, RuntimeException.class})
     public ResponseEntity<RestResponse<Object>> handleAllException(Exception ex) {
-        RestResponse<Object> res = new RestResponse<Object>();
+        RestResponse<Object> res = new RestResponse<>();
         res.setStatusCode(HttpStatus.INTERNAL_SERVER_ERROR.value());
         res.setMessage(ex.getMessage());
         res.setError("Internal Server Error");
@@ -38,7 +38,7 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
     }
 
-    @ExceptionHandler(value = {IdInvalidException.class})
+    @ExceptionHandler(value = {CommonMessageException.class})
     public ResponseEntity<RestResponse<Object>> handleIdInvalidException(Exception ex) {
         RestResponse<Object> res = new RestResponse<Object>();
         res.setMessage(ex.getMessage());
@@ -58,17 +58,17 @@ public class GlobalExceptionHandler {
     }
 
 
-    @ExceptionHandler(value = {
-            UsernameNotFoundException.class,
-            BadCredentialsException.class
-    })
-    public ResponseEntity<RestResponse<Object>> handleIdException(Exception ex) {
-        RestResponse<Object> res = new RestResponse<Object>();
-        res.setMessage(ex.getMessage());
-        res.setStatusCode(HttpStatus.BAD_REQUEST.value());
-        res.setError("Exception occurs...");
-        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
-    }
+//    @ExceptionHandler(value = {
+//            UsernameNotFoundException.class,
+//            BadCredentialsException.class
+//    })
+//    public ResponseEntity<RestResponse<Object>> handleAuthException(Exception ex) {
+//        RestResponse<Object> res = new RestResponse<Object>();
+//        res.setMessage(ex.getMessage());
+//        res.setStatusCode(HttpStatus.BAD_REQUEST.value());
+//        res.setError("Exception occurs...");
+//        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
+//    }
 
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<RestResponse<Object>> validationError(MethodArgumentNotValidException ex) {

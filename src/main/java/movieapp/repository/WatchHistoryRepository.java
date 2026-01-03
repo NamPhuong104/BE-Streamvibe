@@ -1,9 +1,6 @@
 package movieapp.repository;
 
-import movieapp.domain.User;
-import movieapp.domain.WatchHistory;
-import org.springframework.data.domain.Page;
-import org.springframework.data.domain.Pageable;
+import movieapp.entity.WatchHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -64,22 +61,8 @@ public interface WatchHistoryRepository extends JpaRepository<WatchHistory, Long
             """)
     Optional<WatchHistory> findLastedByUserAndMovie(@Param("userId") Long userId, @Param("movieSlug") String movieSlug);
 
-    Optional<WatchHistory> findFirstByUserIdAndMovieSlugOrderByLastWatchedAtDesc(Long userId, String movieSlug);
-
     @Query("SELECT COUNT(DISTINCT wh.movieSlug) FROM WatchHistory wh WHERE wh.user.id = :userId")
     long countDistincMoviesByUserId(@Param("userId") Long userId);
-
-    //    Lịch sử xem (mới nhất)
-    Page<WatchHistory> findByUserIdOrderByLastWatchedAtDesc(Long userId, Pageable pageable);
-
-    //    Tiếp tục xem (chưa hoàn thành)
-    List<WatchHistory> findByUserIdAndCompletedFalseOrderByLastWatchedAtDesc(Long userId);
-
-    //    Lấy tất cả tập của 1 phim
-    List<WatchHistory> findByUserIdAndMovieSlugOrderByEpisodeSlugAsc(Long userId, String movieSlug);
-
-    //    check đã xem phim này chưa
-    boolean existsByUserIdAndMovieSlug(Long userId, String movieSlug);
 
     //    Check user có trong bảng ko
     boolean existsByUserId(Long id);

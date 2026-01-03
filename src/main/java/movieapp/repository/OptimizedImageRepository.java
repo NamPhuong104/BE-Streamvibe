@@ -1,6 +1,6 @@
 package movieapp.repository;
 
-import movieapp.domain.OptimizedImage;
+import movieapp.entity.OptimizedImage;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;

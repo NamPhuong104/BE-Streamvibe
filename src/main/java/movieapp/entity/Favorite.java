@@ -1,4 +1,4 @@
-package movieapp.domain;
+package movieapp.entity;
 
 import jakarta.persistence.*;
 import lombok.*;
@@ -6,7 +6,12 @@ import lombok.*;
 import java.time.LocalDateTime;
 
 @Entity
-@Table(name = "favorites", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "movie_slug"}))
+@Table(name = "favorites", uniqueConstraints = @UniqueConstraint(columnNames = {"user_id", "movie_slug"}),
+        indexes = {
+                // Composite Index cho phân trang theo user
+                // Query: findByUserIdOrderByCreatedAtDesc
+                @Index(name = "idx_favorite_user_created", columnList = "user_id, created_at DESC")
+        })
 @Getter
 @Setter
 @NoArgsConstructor
@@ -32,7 +37,7 @@ public class Favorite {
 
     @Column(name = "poster_url")
     private String posterUrl;
-    
+
     @Column(name = "thumb_url")
     private String thumbUrl;
 

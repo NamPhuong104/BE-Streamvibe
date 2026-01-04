@@ -2,12 +2,12 @@ package movieapp.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
 import lombok.RequiredArgsConstructor;
-import movieapp.entity.User;
 import movieapp.dto.Auth.ReqLoginDTO;
 import movieapp.dto.Auth.ResLoginDTO;
 import movieapp.dto.User.LoginResult;
 import movieapp.dto.User.ResUserDTO;
 import movieapp.dto.User.UserCreateDTO;
+import movieapp.entity.User;
 import movieapp.exception.CommonMessageException;
 import movieapp.exception.ProviderPasswordNotFound;
 import movieapp.util.SecurityUtil;
@@ -18,6 +18,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+
+import java.util.List;
 
 @Service
 @RequiredArgsConstructor
@@ -32,9 +34,9 @@ public class AuthService {
 
     public LoginResult handleLogin(ReqLoginDTO dto) {
         // Lấy thông tin user từ DB
-        User currentUser = userService.handleFindUserByEmailEntity(dto.getUsername());
+        User currentUser = userService.handleFindUserByEmailOrUsername(dto.getUsername());
         if (currentUser == null)
-            throw new UsernameNotFoundException("User không tồn tại");
+            throw new UsernameNotFoundException("Không tìm thấy tài khoản với email/username: " + dto.getUsername());
 
         if ("GOOGLE".equals(currentUser.getProvider()) && currentUser.getPassword() == null || currentUser.getPassword().isEmpty()) {
             throw new ProviderPasswordNotFound("Tài khoản chưa tạo mật khẩu, vui lòng đăng nhập bằng Google hoặc tạo mật khẩu trong cài đặt");
@@ -123,22 +125,27 @@ public class AuthService {
     }
 
     private LoginResult buildLoginResult(User user, String email) {
+        List<String> roleNames = user.getRoleNames();
+        String primaryRole = user.getPrimaryRoleName();
+
         ResLoginDTO.UserLogin userLogin = ResLoginDTO.UserLogin.builder()
                 .id(user.getId())
                 .email(user.getEmail())
-                .role("ROLE_USER")
+                .username(user.getUsername())
                 .fullName(user.getFullName())
                 .avatarUrl(user.getAvatarUrl())
                 .provider(user.getProvider())
                 .providerId(user.getProviderId())
                 .isActive(user.getIsActive())
                 .isEmailVerified(user.getIsEmailVerified())
+                .roles(roleNames)
+                .primaryRole(primaryRole)
                 .build();
 
         ResLoginDTO res = new ResLoginDTO();
         res.setUser(userLogin);
 
-        String accessToken = securityUtil.createAccessToken(email, res);
+        String accessToken = securityUtil.createAccessToken(email, res, roleNames);
         res.setAccessToken(accessToken);
 
         String refreshToken = securityUtil.createRefreshToken(email, res);

@@ -2,16 +2,20 @@ package movieapp.service;
 
 import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import movieapp.entity.OptimizedImage;
-import movieapp.repository.OptimizedImageRepository;
+import movieapp.repository.ImageOptimizationRepository;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.Map;
+import java.util.Optional;
+import java.util.concurrent.ConcurrentHashMap;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class ImageOptimizationService {
     @Value("${ophim.full-url-image}")
     private String imageCdn;
@@ -20,86 +24,95 @@ public class ImageOptimizationService {
     private boolean enableCloudinaryUpload;
 
     private final Cloudinary cloudinary;
-    private final OptimizedImageRepository imageRepository;
+    private final ImageOptimizationRepository imageRepository;
 
-    public ImageOptimizationService(Cloudinary cloudinary, OptimizedImageRepository imageRepository) {
-        this.cloudinary = cloudinary;
-        this.imageRepository = imageRepository;
-    }
+    private final ConcurrentHashMap<String, Object> uploadLocks = new ConcurrentHashMap<>();
 
     public String optimizeThumb(String thumbUrl, String slug) {
         if (thumbUrl == null || thumbUrl.isEmpty()) {
             return null;
         }
+
         String fullUrl = buildFullUrl(thumbUrl);
 
         if (!enableCloudinaryUpload) {
-            return fullUrl;
+            return null;
         }
 
-        String cloudUrl = imageRepository.findByOriginalUrl(fullUrl).map(OptimizedImage::getCloudinaryUrl).orElseGet(() -> {
-            try {
-                return uploadToCloudinarySync(fullUrl, "thumb", slug);
-            } catch (Exception e) {
-                log.warn("⚠️ Failed to upload thumb, using original: {}", e.getMessage());
-                return fullUrl;
-            }
-        });
-
-        return transformUrl(cloudUrl, "w_342,c_fill,q_auto:best,f_auto");
+        return getOrUploadImage(fullUrl, "thumb", slug, "w_342,c_fill,q_auto:best,f_auto");
     }
 
     public String optimizedPoster(String posterUrl, String slug) {
         if (posterUrl == null || posterUrl.isEmpty()) {
             return null;
         }
+
         String fullUrl = buildFullUrl(posterUrl);
+
         if (!enableCloudinaryUpload) {
-            return fullUrl;
+            return null;
         }
-        String cloudUrl = imageRepository.findByOriginalUrl(fullUrl)
-                .map(OptimizedImage::getCloudinaryUrl)
-                .orElseGet(() -> {
-                    try {
-                        return uploadToCloudinarySync(fullUrl, "poster", slug);
-                    } catch (Exception e) {
-                        log.warn("⚠️ Failed to upload poster, using original: {}", e.getMessage());
-                        return fullUrl;
-                    }
-                });
-        return transformUrl(cloudUrl, "w_780,c_fill,q_auto:best,f_auto");
+
+        return getOrUploadImage(fullUrl, "poster", slug, "w_780,c_fill,q_auto:best,f_auto");
     }
 
-    public String getOptimizedThumbOriginal(String thumbUrl) {
-        if (thumbUrl == null || thumbUrl.isEmpty()) return null;
 
-        String fullUrl = buildFullUrl(thumbUrl);
-        return imageRepository.findByOriginalUrl(fullUrl)
-                .map(OptimizedImage::getCloudinaryUrl)
-                .map(url -> transformUrl(url, "w_342,c_fill,q_auto:best,f_auto"))
-                .orElse(fullUrl);
+    private String getOrUploadImage(String fullUrl, String imageType, String slug, String transformation) {
+        // 1. Quick check - không cần lock
+        Optional<OptimizedImage> existing = findInDb(fullUrl, imageType, slug);
+        if (existing.isPresent()) {
+            return transformUrl(existing.get().getCloudinaryUrl(), transformation);
+        }
+
+        // 2. Lấy lock cho URL này
+        Object lock = uploadLocks.computeIfAbsent(fullUrl, k -> new Object());
+
+        synchronized (lock) {
+            try {
+                // 3. Double-check sau khi có lock
+                Optional<OptimizedImage> doubleCheck = findInDb(fullUrl, imageType, slug);
+                if (doubleCheck.isPresent()) {
+                    log.debug("✅ Found after lock for: {}", slug);
+                    return transformUrl(doubleCheck.get().getCloudinaryUrl(), transformation);
+                }
+
+                // 4. Thực sự upload
+                log.info("📤 Uploading {} for {}: {}", imageType, slug, fullUrl);
+                String cloudUrl = uploadToCloudinary(fullUrl, imageType, slug);
+
+                if (cloudUrl != null) {
+                    return transformUrl(cloudUrl, transformation);
+                }
+                return null;
+
+            } catch (Exception e) {
+                log.error("❌ Failed to upload {} for {}: {}", imageType, slug, e.getMessage());
+                return null;
+            } finally {
+                uploadLocks.remove(fullUrl);
+            }
+        }
     }
 
-    public String getOptimizedPosterOriginal(String posterUrl) {
-        if (posterUrl == null || posterUrl.isEmpty()) return null;
+    /**
+     * Tìm trong DB bằng URL hoặc slug+type
+     */
+    private Optional<OptimizedImage> findInDb(String fullUrl, String imageType, String slug) {
+        // Ưu tiên tìm theo URL
+        Optional<OptimizedImage> byUrl = imageRepository.findByOriginalUrl(fullUrl);
+        if (byUrl.isPresent()) {
+            return byUrl;
+        }
 
-        String fullUrl = buildFullUrl(posterUrl);
-
-        return imageRepository.findByOriginalUrl(fullUrl).map(OptimizedImage::getCloudinaryUrl)
-                .map(url -> transformUrl(fullUrl, "w_780,c_fill,q_auto:best,f_auto"))
-                .orElse(fullUrl);
+        // Fallback: tìm theo slug + type
+        return imageRepository.findBySlugAndImageType(slug, imageType);
     }
 
-    private String transformUrl(String url, String transformation) {
-        if (url == null || !url.contains("/upload")) return null;
-
-        return url.replace("upload", "/upload/" + transformation + "/");
-    }
-
-    private String uploadToCloudinarySync(String imageUrl, String type, String slug) {
+    /**
+     * Upload lên Cloudinary và lưu DB
+     */
+    private String uploadToCloudinary(String imageUrl, String type, String slug) {
         try {
-            log.info("📤 Uploading {} to Cloudinary: {}", type, imageUrl);
-
             Map uploadResult = cloudinary.uploader().upload(imageUrl, ObjectUtils.asMap(
                     "folder", "movies",
                     "resource_type", "image",
@@ -107,9 +120,11 @@ public class ImageOptimizationService {
                     "quality", "auto:good",
                     "fetch_format", "auto"
             ));
+
             String cloudinaryUrl = (String) uploadResult.get("secure_url");
             String publicId = (String) uploadResult.get("public_id");
 
+            // Lưu DB
             OptimizedImage optimizedImage = OptimizedImage.builder()
                     .originalUrl(imageUrl)
                     .cloudinaryUrl(cloudinaryUrl)
@@ -119,18 +134,27 @@ public class ImageOptimizationService {
                     .build();
 
             imageRepository.save(optimizedImage);
-
-            log.info("✅ Uploaded successfully: {}", cloudinaryUrl);
+            log.info("✅ Uploaded: {} → {}", slug, cloudinaryUrl);
 
             return cloudinaryUrl;
 
         } catch (Exception e) {
-            log.error("❌ Failed to upload {}: {}", imageUrl, e.getMessage());
-            return imageUrl;
+            log.error("❌ Cloudinary upload failed: {}", e.getMessage());
+            return null;
         }
     }
 
+    private String transformUrl(String url, String transformation) {
+        if (url == null || !url.contains("/upload/")) {
+            return null;
+        }
+        return url.replaceFirst("/upload/", "/upload/" + transformation + "/");
+    }
+
     public String buildFullUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) {
+            return null;
+        }
         if (imageUrl.startsWith("http")) {
             return imageUrl;
         }

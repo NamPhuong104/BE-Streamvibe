@@ -18,6 +18,12 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
 
     boolean existsByEmail(String email);
 
+    boolean existsByUsername(String username);
+
+    Optional<User> findByEmailOrUsername(String email, String username);
+
+    Optional<User> findByUsername(String username);
+
     Optional<User> findByRefreshTokenAndEmail(String refreshToken, String email);
 
     Optional<User> findByResetPasswordToken(String token);
@@ -33,4 +39,8 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
             value = "UPDATE users SET refresh_token = :refreshToken WHERE email = :email"
     )
     void updateRefreshTokenByEmail(String refreshToken, String email);
+
+    long countByIsActiveTrue();
+
+    long countByIsEmailVerifiedTrue();
 }

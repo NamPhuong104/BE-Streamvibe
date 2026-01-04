@@ -2,18 +2,18 @@ package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
-import movieapp.entity.Favorite;
-import movieapp.entity.OptimizedImage;
-import movieapp.entity.User;
 import movieapp.dto.Favorites.FavoriteCreateReq;
 import movieapp.dto.Favorites.FavoriteRes;
 import movieapp.dto.Favorites.FavoriteUpdateReq;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.OphimResponse.OphimMovieDetail;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
+import movieapp.entity.Favorite;
+import movieapp.entity.OptimizedImage;
+import movieapp.entity.User;
 import movieapp.exception.CommonMessageException;
 import movieapp.repository.FavoriteRepository;
-import movieapp.repository.OptimizedImageRepository;
+import movieapp.repository.ImageOptimizationRepository;
 import movieapp.repository.UserRepository;
 import movieapp.util.SecurityUtil;
 import org.springframework.data.domain.Page;
@@ -35,7 +35,7 @@ public class FavoriteService {
     private final FavoriteRepository favoriteRepository;
     private final UserRepository userRepository;
     private final OPhimClientService ophimClient;
-    private final OptimizedImageRepository optimizedImageRepository;
+    private final ImageOptimizationRepository optimizedImageRepository;
     private final ImageOptimizationService imageOptimizationService;
 
     public User getUserById(Long id) {
@@ -129,7 +129,7 @@ public class FavoriteService {
         fav.setLang(dto.getLang());
         fav.setQuality(dto.getQuality());
         String poster = imageOptimizationService.buildFullUrl(dto.getPosterUrl());
-        String thumb = imageOptimizationService.buildFullUrl(fav.getThumbUrl());
+        String thumb = imageOptimizationService.buildFullUrl(dto.getThumbUrl());
 
         if (dto.getPosterUrl() == null || dto.getThumbUrl() == null) {
             try {
@@ -197,6 +197,8 @@ public class FavoriteService {
         res.setEpisodeCurrent(fav.getEpisodeCurrent());
         res.setLang(fav.getLang());
         res.setQuality(fav.getQuality());
+        res.setPosterUrl(fav.getPosterUrl());
+        res.setThumbUrl(fav.getThumbUrl());
         res.setCreatedAt(fav.getCreatedAt());
         res.setUpdatedAt(fav.getUpdatedAt());
         res.setUpdatedAt(fav.getUpdatedAt());

@@ -3,6 +3,8 @@ package movieapp.dto.Auth;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import lombok.*;
 
+import java.util.List;
+
 @Getter
 @Setter
 public class ResLoginDTO {
@@ -26,6 +28,8 @@ public class ResLoginDTO {
         private String providerId;
         private Boolean isActive;
         private Boolean isEmailVerified;
+        private List<String> roles;
+        private String primaryRole;
     }
 
     @Setter
@@ -42,5 +46,6 @@ public class ResLoginDTO {
         private String providerId;
         private boolean isActive;
         private boolean isEmailVerified;
+        private List<String> roles;
     }
 }

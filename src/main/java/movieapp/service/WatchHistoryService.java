@@ -1,15 +1,18 @@
 package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
-import movieapp.entity.OptimizedImage;
-import movieapp.entity.User;
-import movieapp.entity.WatchHistory;
+import lombok.extern.slf4j.Slf4j;
 import movieapp.dto.MetaAndHead.ResultPaginationDTO;
+import movieapp.dto.OphimResponse.OphimMovieDetail;
+import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
 import movieapp.dto.WatchHistory.WatchHistoryCreateReq;
 import movieapp.dto.WatchHistory.WatchHistoryRes;
 import movieapp.dto.WatchHistory.WatchHistoryUpdateReq;
+import movieapp.entity.OptimizedImage;
+import movieapp.entity.User;
+import movieapp.entity.WatchHistory;
 import movieapp.exception.CommonMessageException;
-import movieapp.repository.OptimizedImageRepository;
+import movieapp.repository.ImageOptimizationRepository;
 import movieapp.repository.UserRepository;
 import movieapp.repository.WatchHistoryRepository;
 import movieapp.util.SecurityUtil;
@@ -25,14 +28,18 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class WatchHistoryService {
     private static final double COMPLETE_THRESHOLD = 95;
     private static final String IMAGE_TYPE_THUMB = "thumb";
     private static final String IMAGE_TYPE_POSTER = "poster";
+
     private final WatchHistoryRepository watchHistoryRepository;
-    private final OptimizedImageRepository optimizedImageRepository;
+    private final ImageOptimizationRepository optimizedImageRepository;
+    private final ImageOptimizationService imageOptimizationService;
+    private final OPhimClientService oPhimClientService;
     private final UserRepository userRepository;
     private final Util util;
 
@@ -182,7 +189,31 @@ public class WatchHistoryService {
         history.setProgressPercent(util.roundToOneDecimal(progressPercent));
         history.setCompleted(completed);
         history.setOriginName(dto.getOriginName());
+        String poster = imageOptimizationService.buildFullUrl(dto.getPosterUrl());
+        String thumb = imageOptimizationService.buildFullUrl(dto.getThumbUrl());
 
+        if (dto.getPosterUrl() == null || dto.getThumbUrl() == null) {
+            try {
+                OphimMovieDetailResponse detailResponse = oPhimClientService.getMovieDetail(dto.getMovieSlug());
+
+                OphimMovieDetail movie = detailResponse.getData().getItem();
+                poster = imageOptimizationService.buildFullUrl(movie.getPosterUrl());
+                thumb = imageOptimizationService.buildFullUrl(movie.getThumbUrl());
+
+                if (poster != null) {
+                    history.setPosterUrl(poster);
+                } else if (thumb != null) {
+                    history.setThumbUrl(thumb);
+                }
+            } catch (Exception e) {
+                log.warn("Không lấy được poster mới từ Ophim cho slug {}: {}", history.getMovieSlug(), e.getMessage());
+            }
+        }
+        String posterUrl = poster;
+        String thumbUrl = thumb;
+
+        history.setPosterUrl(posterUrl);
+        history.setThumbUrl(thumbUrl);
         watchHistoryRepository.save(history);
 
         // Lấy ảnh cho single record
@@ -260,6 +291,9 @@ public class WatchHistoryService {
         res.setDuration(history.getDuration());
         res.setProgressPercent(history.getProgressPercent());
         res.setCompleted(history.getCompleted());
+
+        res.setPosterUrl(history.getPosterUrl());
+        res.setThumbUrl(history.getThumbUrl());
 
         res.setCurrentTimeFormatted(util.formatTime(history.getCurrentTime()));
         res.setDurationFormatted(util.formatTime(history.getDuration()));

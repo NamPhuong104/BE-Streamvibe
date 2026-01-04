@@ -15,7 +15,8 @@ public class WatchHistoryCreateReq {
 
     private String movieName;
     private String originName;
-    private String movieThumb;
+    private String thumbUrl;
+    private String posterUrl;
     private String movieType;
 
     private String episodeSlug;

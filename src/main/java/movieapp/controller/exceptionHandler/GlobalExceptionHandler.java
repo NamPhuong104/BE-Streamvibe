@@ -57,19 +57,6 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
     }
 
-
-//    @ExceptionHandler(value = {
-//            UsernameNotFoundException.class,
-//            BadCredentialsException.class
-//    })
-//    public ResponseEntity<RestResponse<Object>> handleAuthException(Exception ex) {
-//        RestResponse<Object> res = new RestResponse<Object>();
-//        res.setMessage(ex.getMessage());
-//        res.setStatusCode(HttpStatus.BAD_REQUEST.value());
-//        res.setError("Exception occurs...");
-//        return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(res);
-//    }
-
     @ExceptionHandler(MethodArgumentNotValidException.class)
     public ResponseEntity<RestResponse<Object>> validationError(MethodArgumentNotValidException ex) {
         BindingResult result = ex.getBindingResult();

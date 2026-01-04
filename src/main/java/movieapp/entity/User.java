@@ -5,7 +5,10 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "users", indexes = {
@@ -99,6 +102,11 @@ public class User {
     @JsonIgnore
     private List<Playlist> playlists;
 
+    @ManyToMany(fetch = FetchType.EAGER)
+    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
+    @Builder.Default
+    private Set<Role> roles = new HashSet<>();
+
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
@@ -107,5 +115,78 @@ public class User {
     @PreUpdate
     protected void onUpdate() {
         updatedAt = LocalDateTime.now();
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Lấy danh sách tên roles
+     */
+    public List<String> getRoleNames() {
+        if (roles == null) return List.of();
+        return roles.stream().map(Role::getName).collect(Collectors.toList());
+    }
+
+    /**
+     * Check user có role cụ thể không
+     */
+    public boolean hasRole(String roleName) {
+        if (roles == null) return false;
+        return roles.stream().anyMatch(role -> role.getName().equals(roleName));
+    }
+
+    /**
+     * Check user có một trong các roles không
+     */
+    public boolean hasAnyRole(String... roleNames) {
+        if (roles == null) return false;
+        Set<String> targetRoles = Set.of(roleNames);
+        return roles.stream().anyMatch(role -> targetRoles.contains(role.getName()));
+    }
+
+    /**
+     * Check user có phải Admin không (ADMIN hoặc SUPER_ADMIN)
+     */
+    public boolean isAdmin() {
+        return hasAnyRole("ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+    }
+
+    /**
+     * Check user có phải Super Admin không
+     */
+    public boolean isSuperAdmin() {
+        return hasRole("ROLE_SUPER_ADMIN");
+    }
+
+    /**
+     * Check user có phải Premium trở lên không
+     */
+    public boolean isPremium() {
+        return hasAnyRole("ROLE_PREMIUM", "ROLE_MODERATOR", "ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+    }
+
+    /**
+     * Check user có phải Moderator trở lên không
+     */
+    public boolean isModerator() {
+        return hasAnyRole("ROLE_MODERATOR", "ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+    }
+
+    /**
+     * Lấy role có quyền cao nhất (priority nhỏ nhất)
+     */
+    public Role getHighestRole() {
+        if (roles == null || roles.isEmpty()) return null;
+        return roles.stream()
+                .min((r1, r2) -> r1.getPriority().compareTo(r2.getPriority()))
+                .orElse(null);
+    }
+
+    /**
+     * Lấy tên role chính (role cao nhất)
+     */
+    public String getPrimaryRoleName() {
+        Role highest = getHighestRole();
+        return highest != null ? highest.getName() : "ROLE_USER";
     }
 }

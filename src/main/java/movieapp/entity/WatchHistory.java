@@ -63,6 +63,12 @@ public class WatchHistory {
     @Column(name = "server_name")
     private String serverName;
 
+    @Column(name = "poster_url")
+    private String posterUrl;
+
+    @Column(name = "thumb_url")
+    private String thumbUrl;
+
     @Column(name = "watch_time", nullable = false)
     private Long currentTime;
 

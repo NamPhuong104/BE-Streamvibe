@@ -1,10 +1,7 @@
 package movieapp.config;
 
 import com.nimbusds.jose.jwk.source.ImmutableSecret;
-
-import java.util.Base64;
-import java.util.List;
-
+import lombok.RequiredArgsConstructor;
 import movieapp.util.SecurityUtil;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
@@ -28,18 +25,22 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
+import java.util.Base64;
+import java.util.List;
 
 @Configuration
-@EnableMethodSecurity(securedEnabled = true)
+@EnableMethodSecurity(securedEnabled = true, prePostEnabled = true)
+@RequiredArgsConstructor
 public class SecurityConfiguration {
 
+    private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
+    private final CustomAccessDeniedHandler customAccessDeniedHandler;
     @Value("${jwt.base64-secret}")
     private String jwtKey;
 
-
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CustomAuthenticationEntryPoint customAuthenticationEntryPoint) throws Exception {
-        String[] whiteList = {
+        String[] publicEndpoints = {
                 "/",
                 "/api/v1/auth/login", "/api/v1/auth/register",
                 "/api/v1/auth/refresh", "/api/v1/auth/logout",
@@ -48,7 +49,6 @@ public class SecurityConfiguration {
                 "/api/v1/auth/change-email/confirm", "/api/v1/auth/resend-verify-email",
                 "/api/v1/homepage/**", "/api/v1/fullHomepage",
                 "/api/v1/health",
-                "/api/v1/admin/**"
         };
 
         http
@@ -56,10 +56,16 @@ public class SecurityConfiguration {
                 .cors(Customizer.withDefaults()) // config CORS
                 .sessionManagement(session -> session.sessionCreationPolicy(SessionCreationPolicy.STATELESS)) //change to stateless mode (not save session on the server)
                 .authorizeHttpRequests(auth -> auth
-                                .requestMatchers(whiteList).permitAll()  // Permit all cho API homepage
-                                .anyRequest().authenticated()  // Auth cho các endpoint khác nếu cần
-//                                .anyRequest().permitAll()
-                ).oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()).authenticationEntryPoint(customAuthenticationEntryPoint))
+                        .requestMatchers(publicEndpoints).permitAll()  // Permit all cho API homepage
+                        .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/v1/premium/**").hasAnyRole("PREMIUM", "MODERATOR", "ADMIN", "SUPER_ADMIN")
+                        .anyRequest().authenticated()  // Auth cho các endpoint khác nếu cần
+                )
+                .exceptionHandling(ex -> ex
+                        .authenticationEntryPoint(customAuthenticationEntryPoint)  // 401 - Chưa đăng nhập
+                        .accessDeniedHandler(customAccessDeniedHandler)            // 403 - Không có quyền
+                )
+                .oauth2ResourceServer(oauth2 -> oauth2.jwt(Customizer.withDefaults()).authenticationEntryPoint(customAuthenticationEntryPoint))
                 .formLogin(f -> f.disable());
         return http.build();
     }

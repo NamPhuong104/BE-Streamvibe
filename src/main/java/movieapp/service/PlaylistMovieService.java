@@ -1,6 +1,9 @@
 package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
+import lombok.extern.slf4j.Slf4j;
+import movieapp.dto.OphimResponse.OphimMovieDetail;
+import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
 import movieapp.entity.OptimizedImage;
 import movieapp.entity.Playlist;
 import movieapp.entity.PlaylistMovie;
@@ -9,7 +12,7 @@ import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.PlaylistMovie.PlaylistMovieCreateDTO;
 import movieapp.dto.PlaylistMovie.PlaylistMovieRes;
 import movieapp.exception.CommonMessageException;
-import movieapp.repository.OptimizedImageRepository;
+import movieapp.repository.ImageOptimizationRepository;
 import movieapp.repository.PlaylistMovieRepository;
 import movieapp.repository.PlaylistRepository;
 import org.springframework.data.domain.Page;
@@ -23,6 +26,7 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+@Slf4j
 @Service
 @RequiredArgsConstructor
 public class PlaylistMovieService {
@@ -30,7 +34,9 @@ public class PlaylistMovieService {
     private static final String IMAGE_TYPE_POSTER = "poster";
     private final PlaylistMovieRepository playlistMovieRepository;
     private final PlaylistRepository playlistRepository;
-    private final OptimizedImageRepository optimizedImageRepository;
+    private final ImageOptimizationRepository optimizedImageRepository;
+    private final ImageOptimizationService imageOptimizationService;
+    private final OPhimClientService oPhimClientService;
     private final UserService userService;
 
     public ResultPaginationDTO handleGetMovieInMyPlaylist(Long playlistId, Pageable pageable) {
@@ -230,13 +236,36 @@ public class PlaylistMovieService {
     }
 
     private PlaylistMovie buildPlaylistMovie(Playlist playlist, PlaylistMovieCreateDTO dto) {
+        String poster = imageOptimizationService.buildFullUrl(dto.getPosterUrl());
+        String thumb = imageOptimizationService.buildFullUrl(dto.getThumbUrl());
+
+        if (dto.getPosterUrl() == null || dto.getThumbUrl() == null) {
+            try {
+                OphimMovieDetailResponse detailResponse = oPhimClientService.getMovieDetail(dto.getMovieSlug());
+
+                OphimMovieDetail movie = detailResponse.getData().getItem();
+                poster = imageOptimizationService.buildFullUrl(movie.getPosterUrl());
+                thumb = imageOptimizationService.buildFullUrl(movie.getThumbUrl());
+
+                if (poster != null) {
+                    dto.setPosterUrl(poster);
+                } else if (thumb != null) {
+                    dto.setThumbUrl(thumb);
+                }
+            } catch (Exception e) {
+                log.warn("Không lấy được poster mới từ Ophim cho slug {}: {}", dto.getMovieSlug(), e.getMessage());
+            }
+        }
+        String posterUrl = poster;
+        String thumbUrl = thumb;
+
         return PlaylistMovie.builder()
                 .playlist(playlist)
                 .movieSlug(dto.getMovieSlug())
                 .movieName(dto.getMovieName())
                 .originName(dto.getOriginName())
-                .posterUrl(dto.getPosterUrl())
-                .thumbUrl(dto.getThumbUrl())
+                .posterUrl(posterUrl)
+                .thumbUrl(thumbUrl)
                 .quality(dto.getQuality())
                 .lang(dto.getLang())
                 .episodeCurrent(dto.getEpisodeCurrent())

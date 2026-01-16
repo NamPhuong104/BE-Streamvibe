@@ -1,6 +1,7 @@
 package movieapp.util;
 
 import lombok.RequiredArgsConstructor;
+import movieapp.config.properties.JwtProperties;
 import movieapp.dto.Auth.ResLoginDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
@@ -23,14 +24,7 @@ import java.util.Optional;
 public class SecurityUtil {
     public static final MacAlgorithm JWT_ALGORITHM = MacAlgorithm.HS512;
     private final JwtEncoder jwtEncoder;
-    @Value("${jwt.base64-secret}")
-    private String jwtKey;
-
-    @Value("${jwt.access-token-validity-in-seconds}")
-    private Long accessTokenExpiration;
-
-    @Value("${jwt.refresh-token-validity-in-seconds}")
-    private Long refreshTokenExpiration;
+    private final JwtProperties jwtProperties;
 
     // 5. Lấy thông tin người dùng đang đăng nhập hiện tại
     public static Optional<String> getCurrentUserLogin() {
@@ -143,7 +137,7 @@ public class SecurityUtil {
         userToken.setRolePriority(dto.getUser().getRolePriority());
 
         Instant now = Instant.now();
-        Instant validity = now.plus(accessTokenExpiration, ChronoUnit.SECONDS);
+        Instant validity = now.plus(jwtProperties.getAccessTokenValidityInSeconds(), ChronoUnit.SECONDS);
 
         // Hardcode tạm quyền (sau này lấy từ DB)
         String role = dto.getUser().getRole() != null ? dto.getUser().getRole() : "ROLE_USER";
@@ -164,7 +158,7 @@ public class SecurityUtil {
     // 2. Tạo Refresh Token
     public String createRefreshToken(String email, ResLoginDTO dto) {
         Instant now = Instant.now();
-        Instant validity = now.plus(refreshTokenExpiration, ChronoUnit.SECONDS);
+        Instant validity = now.plus(jwtProperties.getRefreshTokenValidityInSeconds(), ChronoUnit.SECONDS);
 
         ResLoginDTO.UserInsideToken userToken = new ResLoginDTO.UserInsideToken();
         userToken.setId(dto.getUser().getId());
@@ -184,7 +178,7 @@ public class SecurityUtil {
 
     // 3. Helper lấy Key
     private SecretKey getSecretKey() {
-        byte[] keyBytes = Base64.getDecoder().decode(jwtKey);
+        byte[] keyBytes = Base64.getDecoder().decode(jwtProperties.getBase64Secret());
         return new SecretKeySpec(keyBytes, 0, keyBytes.length, JWT_ALGORITHM.getName());
     }
 

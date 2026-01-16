@@ -35,8 +35,8 @@ public class SecurityConfiguration {
 
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
-    @Value("${jwt.base64-secret}")
-    private String jwtKey;
+    private final AppConfig appConfig;
+    
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CustomAuthenticationEntryPoint customAuthenticationEntryPoint) throws Exception {
@@ -76,7 +76,7 @@ public class SecurityConfiguration {
     }
 
     private SecretKey getSecretKey() {
-        byte[] keyBytes = Base64.getDecoder().decode(jwtKey);
+        byte[] keyBytes = Base64.getDecoder().decode(appConfig.getJwt().getBase64Secret());
         return new SecretKeySpec(keyBytes, 0, keyBytes.length, SecurityUtil.JWT_ALGORITHM.getName());
     }
 

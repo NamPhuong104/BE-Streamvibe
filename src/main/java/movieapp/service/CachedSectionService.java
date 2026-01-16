@@ -3,10 +3,7 @@ package movieapp.service;
 import lombok.extern.slf4j.Slf4j;
 import movieapp.dto.CustomFieldsResponse.MovieItemDTO;
 import movieapp.dto.HomepageReponse.HomepageResponse;
-import movieapp.dto.OphimResponse.OphimHomepageResponse;
-import movieapp.dto.OphimResponse.OphimListResponse;
-import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
-import movieapp.dto.OphimResponse.OphimMovieItem;
+import movieapp.dto.OphimResponse.*;
 import org.springframework.beans.BeanUtils;
 import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.cache.annotation.Cacheable;
@@ -21,22 +18,19 @@ import java.util.stream.Collectors;
 @Service
 @Slf4j
 public class CachedSectionService {
-    private static final Set<String> BLOCKED_CATEGORIES = Set.of(
-            "phim-18",
-            "phim 18+",
-            "18+"
-    );
-    private static final Set<String> BLOCKED_EPISODE_STATUS = Set.of(
-            "trailer"
-    );
-    // Số phim cần lấy mặc định
-    private static final int DEFAULT_LIMIT = 14;
 
     // ==================== FILTER CONSTANTS ====================
-    // Multiplier để fetch nhiều hơn (đề phòng bị filter bớt)
+    private static final Set<String> BLOCKED_CATEGORIES = Set.of("phim-18", "phim 18+", "18+");
+    private static final Set<String> BLOCKED_EPISODE_STATUS = Set.of("trailer");
+    private static final Set<String> BLOCKED_TYPE = Set.of("hoathinh");
+
+    // ==================== SECTION CONFIGS ====================
+    private static final int SECTION1_REQUIRED_COUNT = 7;
+    private static final int SECTION6_REQUIRED_COUNT = 14;
+    private static final int DEFAULT_LIMIT = 14;
     private static final int FETCH_MULTIPLIER = 3;
-    // Số page tối đa để fetch
     private static final int MAX_PAGES = 5;
+
     private final OPhimClientService ophimClient;
     private final ImageOptimizationService imageService;
     private final ExecutorService executorService;
@@ -51,20 +45,13 @@ public class CachedSectionService {
 
     // ==================== FILTER PREDICATES ====================
 
-    /**
-     * Kiểm tra phim có phải Trailer không
-     */
     private boolean isTrailer(OphimMovieItem item) {
         if (item.getEpisodeCurrent() == null) return false;
         return BLOCKED_EPISODE_STATUS.contains(item.getEpisodeCurrent().toLowerCase().trim());
     }
 
-    /**
-     * Kiểm tra phim có phải 18+ không
-     */
     private boolean isAdultContent(OphimMovieItem item) {
         if (item.getCategory() == null || item.getCategory().isEmpty()) return false;
-
         return item.getCategory().stream()
                 .anyMatch(cat -> {
                     String slug = cat.getSlug() != null ? cat.getSlug().toLowerCase() : "";
@@ -73,20 +60,45 @@ public class CachedSectionService {
                 });
     }
 
+    private boolean isAnime(OphimMovieItem item) {
+        if (item.getType() == null || item.getType().isEmpty()) return false;
+        return BLOCKED_TYPE.contains(item.getType().trim().toLowerCase());
+    }
+
+    // ==================== PREDICATES ====================
+
     /**
-     * Predicate: Phim hợp lệ (không phải Trailer và không phải 18+)
+     * Predicate cho sections thường: !18+ && !trailer && !hoathinh
      */
     private Predicate<OphimMovieItem> isValidMovie() {
-        return item -> !isTrailer(item) && !isAdultContent(item);
+        return item -> !isTrailer(item) && !isAdultContent(item) && !isAnime(item);
     }
 
     /**
-     * Filter danh sách phim
+     * Predicate cho section 9 (hoạt hình): !18+ && !trailer
      */
-    private List<OphimMovieItem> filterValidMovies(List<OphimMovieItem> items) {
-        return items.stream()
-                .filter(isValidMovie())
-                .collect(Collectors.toList());
+    private Predicate<OphimMovieItem> isValidAnimation() {
+        return item -> !isTrailer(item) && !isAdultContent(item);
+    }
+
+    // ==================== PLAYABLE CHECK ====================
+
+    private boolean hasPlayableEpisodes(OphimMovieDetail detail) {
+        if (detail == null) return false;
+        List<OphimMovieDetail.Episode> episodes = detail.getEpisodes();
+        if (episodes == null || episodes.isEmpty()) return false;
+
+        return episodes.stream()
+                .filter(ep -> ep.getServerData() != null && !ep.getServerData().isEmpty())
+                .flatMap(ep -> ep.getServerData().stream())
+                .anyMatch(this::isEpisodeDataPlayable);
+    }
+
+    private boolean isEpisodeDataPlayable(OphimMovieDetail.EpisodeData episodeData) {
+        if (episodeData == null) return false;
+        String m3u8 = episodeData.getLinkM3u8();
+        String embed = episodeData.getLinkEmbed();
+        return (m3u8 != null && !m3u8.trim().isEmpty()) || (embed != null && !embed.trim().isEmpty());
     }
 
     // ==================== FETCH RAW OPHIM ====================
@@ -97,32 +109,48 @@ public class CachedSectionService {
         return ophimClient.getHomepage();
     }
 
-    // ==================== SECTION 1: Hero Banner (7 items với detail) ====================
+    // ==================== SECTION 1: Hero Banner ====================
 
     @Cacheable(value = "homepage", key = "'section1'")
     public List<MovieItemDTO> fetchSection1() {
-        log.info("📥 Fetching Section 1 (7 items with POSTER + CONTENT)...");
+        log.info("📥 Fetching Section 1 (7 PLAYABLE items)...");
+        long startTime = System.currentTimeMillis();
+
         OphimHomepageResponse rawData = fetchHomepageRaw();
         List<OphimMovieItem> rawItems = rawData.getData().getItems();
 
-        // Filter và lấy 7 items đầu tiên
-        List<OphimMovieItem> validItems = filterValidMovies(rawItems)
-                .stream()
-                .limit(7)
+        log.info("📊 Section 1: Raw {} items", rawItems.size());
+
+        // Pre-filter: !18+ && !trailer && !hoathinh
+        List<OphimMovieItem> preFilterItems = rawItems.stream()
+                .filter(isValidMovie())
                 .collect(Collectors.toList());
 
-        log.info("📊 Section 1: {} valid items after filtering", validItems.size());
-        return fetchItemsWithDetailParallel(validItems);
+        log.info("📊 Section 1: {} items after pre-filter", preFilterItems.size());
+
+        // Fetch detail + check playable
+        List<MovieItemDTO> playableMovies = fetchPlayableItemsParallel(preFilterItems, SECTION1_REQUIRED_COUNT);
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("✅ Section 1: {} PLAYABLE movies in {}ms", playableMovies.size(), duration);
+
+        return playableMovies;
     }
 
-    // ==================== SECTION 2: Tabs (Korea, China, US/UK) ====================
+    // ==================== SECTION 2: Tabs ====================
 
     @Cacheable(value = "homepage", key = "'section2'")
     public HomepageResponse.Section2Data fetchSection2() {
         log.info("📥 Fetching Section 2...");
+        long startTime = System.currentTimeMillis();
+
         List<MovieItemDTO> listKorea = listKoreaRaw();
         List<MovieItemDTO> listChina = listChinaRaw();
         List<MovieItemDTO> listUSUK = listUSUKRaw();
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("✅ Section 2: Korea={}, China={}, USUK={} in {}ms",
+                listKorea.size(), listChina.size(), listUSUK.size(), duration);
 
         return HomepageResponse.Section2Data.builder()
                 .ListKorea(listKorea)
@@ -132,184 +160,192 @@ public class CachedSectionService {
     }
 
     public List<MovieItemDTO> listKoreaRaw() {
-        log.info("📥 Fetching Section 2 List Korea...");
         Map<String, String> params = new HashMap<>();
         params.put("country", "han-quoc");
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
     public List<MovieItemDTO> listChinaRaw() {
-        log.info("📥 Fetching Section 2 List China...");
         Map<String, String> params = new HashMap<>();
         params.put("country", "trung-quoc");
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
     public List<MovieItemDTO> listUSUKRaw() {
-        log.info("📥 Fetching Section 2 List US/UK...");
         Map<String, String> params = new HashMap<>();
         params.put("country", "au-my");
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
-    // ==================== SECTION 3-12 ====================
+    // ==================== SECTIONS 3-5, 7-8, 10-12 ====================
 
     @Cacheable(value = "homepage", key = "'section3'")
     public List<MovieItemDTO> fetchSection3() {
-        log.info("📥 Fetching Section 3 List Series...");
+        log.info("📥 Fetching Section 3 (Series)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
-
         return fetchListSectionWithFilter("phim-bo", params, DEFAULT_LIMIT);
     }
 
     @Cacheable(value = "homepage", key = "'section4'")
     public List<MovieItemDTO> fetchSection4() {
-        log.info("📥 Fetching Section 4 List Action...");
+        log.info("📥 Fetching Section 4 (Action)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "hanh-dong");
-
         return fetchListSectionWithFilter("phim-chieu-rap", params, DEFAULT_LIMIT);
     }
 
     @Cacheable(value = "homepage", key = "'section5'")
     public List<MovieItemDTO> fetchSection5() {
-        log.info("📥 Fetching Section 5 List Single...");
+        log.info("📥 Fetching Section 5 (Single)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
-
         return fetchListSectionWithFilter("phim-le", params, DEFAULT_LIMIT);
     }
 
+    // ==================== ✅ SECTION 6: FIX DUPLICATE ISSUE ====================
+
     @Cacheable(value = "homepage", key = "'section6'")
     public List<MovieItemDTO> fetchSection6() {
-        log.info("📥 Fetching Section 6 (14 items from homepage raw)...");
+        log.info("📥 Fetching Section 6 (14 PLAYABLE items, skip Section 1 used)...");
+        long startTime = System.currentTimeMillis();
+
         OphimHomepageResponse rawData = fetchHomepageRaw();
         List<OphimMovieItem> rawItems = rawData.getData().getItems();
 
-        // Skip 7 items đầu (đã dùng cho section 1), filter, lấy 14
-        List<OphimMovieItem> validItems = rawItems.stream()
-                .skip(7)
+        // Filter TRƯỚC, sau đó skip 7 items đã filter
+        // Điều này đảm bảo skip đúng 7 items mà Section 1 đã dùng
+        List<OphimMovieItem> preFilteredItems = rawItems.stream()
                 .filter(isValidMovie())
-                .limit(DEFAULT_LIMIT)
+                .skip(SECTION1_REQUIRED_COUNT)  // Skip 7 items ĐÃ FILTER
                 .collect(Collectors.toList());
 
-        log.info("📊 Section 6: {} valid items after filtering", validItems.size());
-        return validItems.stream()
-                .map(this::processItemWithoutDetail)
-                .collect(Collectors.toList());
+        log.info("📊 Section 6: {} items after filter + skip", preFilteredItems.size());
+
+        // Fetch detail + check playable
+        List<MovieItemDTO> playableMovies = fetchPlayableItemsParallel(preFilteredItems, SECTION6_REQUIRED_COUNT);
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("✅ Section 6: {} PLAYABLE movies in {}ms", playableMovies.size(), duration);
+
+        return playableMovies;
     }
 
     @Cacheable(value = "homepage", key = "'section7'")
     public List<MovieItemDTO> fetchSection7() {
-        log.info("📥 Fetching Section 7 List Horror...");
+        log.info("📥 Fetching Section 7 (Horror Thai)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "kinh-di");
         params.put("country", "thai-lan");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
     @Cacheable(value = "homepage", key = "'section8'")
     public List<MovieItemDTO> fetchSection8() {
-        log.info("📥 Fetching Section 8 List Korea Love...");
+        log.info("📥 Fetching Section 8 (Korea Romance)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "tinh-cam");
         params.put("country", "han-quoc");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
+    // ==================== SECTION 9: Cartoon ====================
+
     @Cacheable(value = "homepage", key = "'section9'")
     public List<MovieItemDTO> fetchSection9() {
-        log.info("📥 Fetching Section 9 (Cartoon with content)...");
+        log.info("📥 Fetching Section 9 (Cartoon PLAYABLE)...");
+        long startTime = System.currentTimeMillis();
+
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("country", "nhat-ban,han-quoc");
 
-        // Fetch với filter, sau đó lấy detail
-        List<OphimMovieItem> validItems = fetchRawItemsWithFilter("hoat-hinh", params, DEFAULT_LIMIT);
-        return fetchItemsWithDetailParallel(validItems);
+        // Fetch raw với filter cho animation (KHÔNG filter type hoathinh)
+        List<OphimMovieItem> preFilteredItems = fetchRawItemsGeneric(
+                "hoat-hinh",
+                params,
+                DEFAULT_LIMIT * 2,
+                isValidAnimation()
+        );
+
+        // Fetch detail + check playable
+        List<MovieItemDTO> playableMovies = fetchPlayableItemsParallel(preFilteredItems, DEFAULT_LIMIT);
+
+        long duration = System.currentTimeMillis() - startTime;
+        log.info("✅ Section 9: {} PLAYABLE animations in {}ms", playableMovies.size(), duration);
+
+        return playableMovies;
     }
 
     @Cacheable(value = "homepage", key = "'section10'")
     public List<MovieItemDTO> fetchSection10() {
-        log.info("📥 Fetching Section 10 List Crime...");
+        log.info("📥 Fetching Section 10 (Crime)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "hinh-su");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
     @Cacheable(value = "homepage", key = "'section11'")
     public List<MovieItemDTO> fetchSection11() {
-        log.info("📥 Fetching Section 11 List Secret...");
+        log.info("📥 Fetching Section 11 (Mystery)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "bi-an");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
     @Cacheable(value = "homepage", key = "'section12'")
     public List<MovieItemDTO> fetchSection12() {
-        log.info("📥 Fetching Section 12 List Adventure...");
+        log.info("📥 Fetching Section 12 (Adventure)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "phieu-luu");
-
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 
     // ==================== HELPER METHODS ====================
 
     /**
-     * ✅ CORE METHOD: Fetch list với filter, đảm bảo đủ số lượng
-     * <p>
-     * Logic:
-     * 1. Fetch page 1 với limit lớn (gấp 3 lần cần thiết)
-     * 2. Filter bỏ Trailer và 18+
-     * 3. Nếu đủ số lượng → return
-     * 4. Nếu không đủ → fetch thêm page tiếp theo
-     * 5. Repeat cho đến khi đủ hoặc hết data
+     * Fetch list với filter cho sections thường (không check playable)
      */
     private List<MovieItemDTO> fetchListSectionWithFilter(String slug, Map<String, String> baseParams, int requiredCount) {
-        List<OphimMovieItem> validItems = fetchRawItemsWithFilter(slug, baseParams, requiredCount);
-
+        List<OphimMovieItem> validItems = fetchRawItemsGeneric(slug, baseParams, requiredCount, isValidMovie());
         return validItems.stream()
                 .map(this::processItemWithoutDetail)
                 .collect(Collectors.toList());
     }
 
     /**
-     * Fetch raw items với filter, đảm bảo đủ số lượng
+     * Generic fetch method với custom filter predicate
      */
-    private List<OphimMovieItem> fetchRawItemsWithFilter(String slug, Map<String, String> baseParams, int requiredCount) {
+    private List<OphimMovieItem> fetchRawItemsGeneric(
+            String slug,
+            Map<String, String> baseParams,
+            int requiredCount,
+            Predicate<OphimMovieItem> filterPredicate
+    ) {
         List<OphimMovieItem> collectedItems = new ArrayList<>();
         int currentPage = 1;
-        int fetchLimit = requiredCount * FETCH_MULTIPLIER; // Fetch gấp 3 lần
+        int fetchLimit = requiredCount * FETCH_MULTIPLIER;
 
         while (collectedItems.size() < requiredCount && currentPage <= MAX_PAGES) {
             try {
@@ -317,109 +353,129 @@ public class CachedSectionService {
                 params.put("page", String.valueOf(currentPage));
                 params.put("limit", String.valueOf(fetchLimit));
 
-                log.debug("📄 Fetching page {} with limit {} for {}", currentPage, fetchLimit, slug);
-
                 OphimListResponse response = ophimClient.getListBySlug(slug, params);
 
                 if (response == null || response.getData() == null ||
                         response.getData().getItems() == null || response.getData().getItems().isEmpty()) {
-                    log.warn("⚠️ No more data available at page {}", currentPage);
+                    log.debug("⚠️ No more data at page {}", currentPage);
                     break;
                 }
 
                 List<OphimMovieItem> items = response.getData().getItems();
-                List<OphimMovieItem> validItems = filterValidMovies(items);
 
-                log.debug("📊 Page {}: {} total, {} valid after filter",
-                        currentPage, items.size(), validItems.size());
+                // Dùng custom filter predicate
+                List<OphimMovieItem> validItems = items.stream()
+                        .filter(filterPredicate)
+                        .collect(Collectors.toList());
+
+                log.debug("📊 {} page {}: {} raw → {} valid", slug, currentPage, items.size(), validItems.size());
 
                 collectedItems.addAll(validItems);
 
-                // Nếu page này trả về ít hơn limit → đã hết data
                 if (items.size() < fetchLimit) {
-                    log.debug("📊 Reached end of data at page {}", currentPage);
                     break;
                 }
-
                 currentPage++;
 
             } catch (Exception e) {
-                log.error("❌ Error fetching page {} for {}: {}", currentPage, slug, e.getMessage());
+                log.error("❌ Error fetching {} page {}: {}", slug, currentPage, e.getMessage());
                 break;
             }
         }
 
-        // Limit lại đúng số lượng cần
         List<OphimMovieItem> result = collectedItems.stream()
                 .limit(requiredCount)
                 .collect(Collectors.toList());
 
-        log.info("📊 {} - Collected {} valid items (required: {})", slug, result.size(), requiredCount);
-
-        if (result.size() < requiredCount) {
-            log.warn("⚠️ {} - Only got {} items, less than required {}", slug, result.size(), requiredCount);
-        }
+        log.info("📊 {} - Got {} items (required: {})", slug, result.size(), requiredCount);
 
         return result;
     }
 
     /**
-     * Fetch items với detail (parallel)
+     * Fetch detail + check playable cho list items (parallel)
      */
-    private List<MovieItemDTO> fetchItemsWithDetailParallel(List<OphimMovieItem> items) {
-        log.info("🚀 Fetching detail for {} items in PARALLEL...", items.size());
+    private List<MovieItemDTO> fetchPlayableItemsParallel(List<OphimMovieItem> candidates, int requiredCount) {
+        log.debug("🚀 Checking playable for {} candidates (need {})...", candidates.size(), requiredCount);
 
-        List<CompletableFuture<MovieItemDTO>> futures = items.stream()
-                .map(item -> CompletableFuture.supplyAsync(() -> processItemWithDetail(item), executorService))
+        List<CompletableFuture<MovieItemDTO>> futures = candidates.stream()
+                .map(item -> CompletableFuture.supplyAsync(
+                        () -> processItemWithDetailAndPlayableCheck(item),
+                        executorService
+                ))
                 .collect(Collectors.toList());
 
-        return futures.stream()
-                .map(CompletableFuture::join)
+        List<MovieItemDTO> result = futures.stream()
+                .map(future -> {
+                    try {
+                        return future.join();
+                    } catch (Exception e) {
+                        log.error("❌ Future failed: {}", e.getMessage());
+                        return null;
+                    }
+                })
+                .filter(Objects::nonNull)
+                .limit(requiredCount)
                 .collect(Collectors.toList());
+
+        log.debug("📊 Got {} playable out of {} candidates", result.size(), candidates.size());
+
+        return result;
     }
 
     /**
-     * Process item với detail (có content)
+     * Process item: Fetch detail + Check playable + Build DTO
+     *
+     * @return MovieItemDTO nếu playable, NULL nếu không
      */
-    private MovieItemDTO processItemWithDetail(OphimMovieItem item) {
-        MovieItemDTO dto = new MovieItemDTO();
-        BeanUtils.copyProperties(item, dto);
-
+    private MovieItemDTO processItemWithDetailAndPlayableCheck(OphimMovieItem item) {
         try {
-            log.debug("📄 Fetching content for: {}", item.getSlug());
             OphimMovieDetailResponse detailResponse = ophimClient.getMovieDetail(item.getSlug());
-            var detailItem = detailResponse.getData().getItem();
 
-            // Set content
+            if (detailResponse == null || detailResponse.getData() == null
+                    || detailResponse.getData().getItem() == null) {
+                log.debug("⚠️ Empty detail for: {}", item.getSlug());
+                return null;
+            }
+
+            OphimMovieDetail detailItem = detailResponse.getData().getItem();
+
+            // CHECK PLAYABLE
+            if (!hasPlayableEpisodes(detailItem)) {
+                log.debug("⏭️ SKIP {} - no playable episodes", item.getSlug());
+                return null;
+            }
+
+            log.debug("✅ KEEP {} - has playable episodes", item.getSlug());
+
+            // Build DTO
+            MovieItemDTO dto = new MovieItemDTO();
+            BeanUtils.copyProperties(item, dto);
+
             dto.setContent(detailItem.getContent());
 
-            // Update poster_url và thumb_url từ detail nếu list trả về null
-            String detailPosterUrl = detailItem.getPosterUrl();
-            String detailThumbUrl = detailItem.getThumbUrl();
+            String posterUrl = (detailItem.getPosterUrl() != null && !detailItem.getPosterUrl().isEmpty())
+                    ? detailItem.getPosterUrl()
+                    : item.getPosterUrl();
+            String thumbUrl = (detailItem.getThumbUrl() != null && !detailItem.getThumbUrl().isEmpty())
+                    ? detailItem.getThumbUrl()
+                    : item.getThumbUrl();
 
-            if ((dto.getPosterUrl() == null || dto.getPosterUrl().isEmpty()) && detailPosterUrl != null) {
-                dto.setPosterUrl(detailPosterUrl);
-            }
-            if ((dto.getThumbUrl() == null || dto.getThumbUrl().isEmpty()) && detailThumbUrl != null) {
-                dto.setThumbUrl(detailThumbUrl);
-            }
+            dto.setPosterUrl(posterUrl);
+            dto.setThumbUrl(thumbUrl);
+            dto.setOptimizedThumb(imageService.optimizeThumb(thumbUrl, item.getSlug()));
+            dto.setOptimizedPoster(imageService.optimizedPoster(posterUrl, item.getSlug()));
 
-            // Optimize images từ detail API
-            dto.setOptimizedThumb(imageService.optimizeThumb(detailThumbUrl, detailItem.getSlug()));
-            dto.setOptimizedPoster(imageService.optimizedPoster(detailPosterUrl, detailItem.getSlug()));
+            return dto;
 
         } catch (Exception e) {
-            log.warn("⚠️ Failed to fetch content for {}: {}", item.getSlug(), e.getMessage());
-            dto.setContent(null);
-            // Fallback: optimize từ list API data
-            dto.setOptimizedThumb(imageService.optimizeThumb(item.getThumbUrl(), item.getSlug()));
-            dto.setOptimizedPoster(imageService.optimizedPoster(item.getPosterUrl(), item.getSlug()));
+            log.error("❌ Error processing {}: {}", item.getSlug(), e.getMessage());
+            return null;
         }
-        return dto;
     }
 
     /**
-     * Process item không có detail (chỉ optimize ảnh)
+     * Process item không cần check playable (cho sections 2-5, 7-8, 10-12)
      */
     private MovieItemDTO processItemWithoutDetail(OphimMovieItem item) {
         MovieItemDTO dto = new MovieItemDTO();

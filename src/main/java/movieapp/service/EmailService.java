@@ -2,7 +2,7 @@ package movieapp.service;
 
 import jakarta.mail.internet.MimeMessage;
 import lombok.RequiredArgsConstructor;
-import org.springframework.beans.factory.annotation.Value;
+import movieapp.config.properties.MailProperties;
 import org.springframework.core.io.ClassPathResource;
 import org.springframework.mail.javamail.JavaMailSender;
 import org.springframework.mail.javamail.MimeMessageHelper;
@@ -17,19 +17,14 @@ import java.nio.charset.StandardCharsets;
 @RequiredArgsConstructor
 public class EmailService {
     private final JavaMailSender mailSender;
+    private final MailProperties mailProperties;
 
-    @Value("${spring.mail.username}")
-    private String from;
-
-    @Value("${app.frontend-url}")
-    private String frontendUrl;
 
     @Async("taskExecutor")
     public void sendResetPasswordEmail(String to, String userName, String token) {
         try {
-            String resetUrl = frontendUrl + "/reset-password?token=" + token;
             String htmlTemplate = loadHtmlTemplate("templates/reset-password.html");
-            String htmlContent = htmlTemplate.replace("{{RESET_URL}}", resetUrl)
+            String htmlContent = htmlTemplate
                     .replace("{{USER_NAME}}", userName != null ? userName : "")
                     .replace("{{TOKEN}}", token);
 
@@ -40,7 +35,7 @@ public class EmailService {
                     StandardCharsets.UTF_8.name()
             );
             helper.setTo(to);
-            helper.setFrom(from);
+            helper.setFrom(mailProperties.getUsername());
             helper.setSubject("Đặt lại mật khẩu - Streamvibe");
             helper.setText(htmlContent, true);
             mailSender.send(message);
@@ -52,9 +47,8 @@ public class EmailService {
     @Async("taskExecutor")
     public void sendActiveEmail(String to, String userName, String token) {
         try {
-            String verifyUrl = frontendUrl + "/verify-email?token=" + token;
             String htmlTemplate = loadHtmlTemplate("templates/active-email.html");
-            String htmlContent = htmlTemplate.replace("{{VERIFY_URL}}", verifyUrl)
+            String htmlContent = htmlTemplate
                     .replace("{{USER_NAME}}", userName != null ? userName : "")
                     .replace("{{TOKEN}}", token);
             MimeMessage message = mailSender.createMimeMessage();
@@ -64,7 +58,7 @@ public class EmailService {
                     StandardCharsets.UTF_8.name()
             );
             helper.setTo(to);
-            helper.setFrom(from);
+            helper.setFrom(mailProperties.getUsername());
             helper.setSubject("Kích hoạt tài khoản - Streamvibe");
             helper.setText(htmlContent, true);
             mailSender.send(message);
@@ -76,9 +70,8 @@ public class EmailService {
     @Async("taskExecutor")
     public void sendChangeEmail(String to, String userName, String currentEmail, String newEmail, String token) {
         try {
-            String verifyUrl = frontendUrl + "/change-email/confirm?token=" + token;
             String htmlTemplate = loadHtmlTemplate("templates/change-email.html");
-            String htmlContent = htmlTemplate.replace("{{VERIFY_URL}}", verifyUrl).replace("{{USER_NAME}}", userName != null ? userName : "")
+            String htmlContent = htmlTemplate.replace("{{USER_NAME}}", userName != null ? userName : "")
                     .replace("{{CURRENT_EMAIL}}", currentEmail).replace("{{NEW_EMAIL}}", newEmail)
                     .replace("{{TOKEN}}", token);
             MimeMessage message = mailSender.createMimeMessage();
@@ -88,7 +81,7 @@ public class EmailService {
                     StandardCharsets.UTF_8.name()
             );
             helper.setTo(to);
-            helper.setFrom(from);
+            helper.setFrom(mailProperties.getUsername());
             helper.setSubject("Thay đổi email - Streamvibe");
             helper.setText(htmlContent, true);
             mailSender.send(message);
@@ -110,7 +103,7 @@ public class EmailService {
                     StandardCharsets.UTF_8.name()
             );
             helper.setTo(to);
-            helper.setFrom(from);
+            helper.setFrom(mailProperties.getUsername());
             helper.setSubject("Cảnh Báo Thay đổi email - Streamvibe");
             helper.setText(htmlContent, true);
             mailSender.send(message);

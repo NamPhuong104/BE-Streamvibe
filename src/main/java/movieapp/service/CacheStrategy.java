@@ -1,6 +1,9 @@
 package movieapp.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import movieapp.config.properties.CacheProperties;
+import org.hibernate.Cache;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.data.redis.core.RedisTemplate;
 import org.springframework.retry.annotation.Recover;
@@ -14,10 +17,12 @@ import java.util.concurrent.TimeUnit;
 
 @Service
 @Slf4j
+@RequiredArgsConstructor
 public class CacheStrategy {
     private final HomepageService homepageService;
     private final CachedSectionService cachedSectionService;
     private final RedisTemplate<String, Object> redisTemplate;
+    private final CacheProperties cache;
 
     // ===================================
     // INJECT CONFIGURATION VALUES
@@ -31,12 +36,6 @@ public class CacheStrategy {
     @Value("${app.cache.schedule.enabled:true}")
     private boolean scheduleEnabled;
 
-
-    public CacheStrategy(HomepageService homepageService, CachedSectionService cachedSectionService, RedisTemplate<String, Object> redisTemplate) {
-        this.homepageService = homepageService;
-        this.cachedSectionService = cachedSectionService;
-        this.redisTemplate = redisTemplate;
-    }
 
     // ===================================
     // WARM-UP ON STARTUP (Sử dụng config)
@@ -223,7 +222,7 @@ public class CacheStrategy {
 
             Object tempValue = redisTemplate.opsForValue().get(tempKey);
             if (tempValue != null) {
-                redisTemplate.opsForValue().set(redisKey, tempValue, cacheTtlMinutes, TimeUnit.MINUTES);
+                redisTemplate.opsForValue().set(redisKey, tempValue, cache.getTtlMinutes(), TimeUnit.MINUTES);
                 log.info("↩️ Restored {} from backup", redisKey);
             }
         }

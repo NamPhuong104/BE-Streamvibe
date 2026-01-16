@@ -6,6 +6,7 @@ import com.google.api.client.http.javanet.NetHttpTransport;
 import com.google.api.client.json.gson.GsonFactory;
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import movieapp.config.AppConfig;
 import movieapp.dto.Auth.*;
 import movieapp.dto.User.LoginResult;
 import movieapp.dto.User.ResUserDTO;
@@ -17,7 +18,6 @@ import movieapp.service.AuthService;
 import movieapp.service.UserService;
 import movieapp.util.SecurityUtil;
 import movieapp.util.annotation.ApiMessage;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseCookie;
@@ -36,11 +36,7 @@ public class AuthController {
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final SecurityUtil securityUtil;
     private final UserService userService;
-
-    @Value("${jwt.refresh-token-validity-in-seconds}")
-    private Long refreshTokenExpiration;
-    @Value("${google.client-id}")
-    private String googleClientId;
+    private final AppConfig app;
 
     @PostMapping("/register")
     @ApiMessage("Đăng ký tài khoản thành công")
@@ -168,7 +164,7 @@ public class AuthController {
                 .httpOnly(true)
                 .secure(true)
                 .path("/")
-                .maxAge(refreshTokenExpiration)
+                .maxAge(app.getJwt().getRefreshTokenValidityInSeconds())
                 .sameSite("Strict")
                 .build();
 
@@ -180,7 +176,7 @@ public class AuthController {
             NetHttpTransport transport = new NetHttpTransport();
             GsonFactory jsonFactory = GsonFactory.getDefaultInstance();
 
-            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory).setAudience(Collections.singletonList(googleClientId)).build();
+            GoogleIdTokenVerifier verifier = new GoogleIdTokenVerifier.Builder(transport, jsonFactory).setAudience(Collections.singletonList(app.getGoogle().getClientId())).build();
 
             return verifier.verify(idTokenString);
         } catch (Exception e) {

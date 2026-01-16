@@ -4,6 +4,8 @@ import com.cloudinary.Cloudinary;
 import com.cloudinary.utils.ObjectUtils;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import movieapp.config.properties.AppProperties;
+import movieapp.config.properties.OPhimProperties;
 import movieapp.entity.OptimizedImage;
 import movieapp.repository.ImageOptimizationRepository;
 import org.springframework.beans.factory.annotation.Value;
@@ -17,14 +19,10 @@ import java.util.concurrent.ConcurrentHashMap;
 @Slf4j
 @RequiredArgsConstructor
 public class ImageOptimizationService {
-    @Value("${ophim.full-url-image}")
-    private String imageCdn;
-
-    @Value("${app.image.enable-cloudinary:false}")
-    private boolean enableCloudinaryUpload;
-
     private final Cloudinary cloudinary;
     private final ImageOptimizationRepository imageRepository;
+    private final AppProperties appProperties;
+    private final OPhimProperties oPhimProperties;
 
     private final ConcurrentHashMap<String, Object> uploadLocks = new ConcurrentHashMap<>();
 
@@ -35,7 +33,7 @@ public class ImageOptimizationService {
 
         String fullUrl = buildFullUrl(thumbUrl);
 
-        if (!enableCloudinaryUpload) {
+        if (!appProperties.getImage().isEnableCloudinary()) {
             return null;
         }
 
@@ -49,7 +47,7 @@ public class ImageOptimizationService {
 
         String fullUrl = buildFullUrl(posterUrl);
 
-        if (!enableCloudinaryUpload) {
+        if (!appProperties.getImage().isEnableCloudinary()) {
             return null;
         }
 
@@ -158,6 +156,6 @@ public class ImageOptimizationService {
         if (imageUrl.startsWith("http")) {
             return imageUrl;
         }
-        return imageCdn + "/" + imageUrl;
+        return oPhimProperties.getFullUrlImage() + "/" + imageUrl;
     }
 }

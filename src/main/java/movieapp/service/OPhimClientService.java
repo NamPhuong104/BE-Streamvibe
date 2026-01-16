@@ -1,10 +1,11 @@
 package movieapp.service;
 
+import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import movieapp.config.properties.OPhimProperties;
 import movieapp.dto.OphimResponse.OphimHomepageResponse;
 import movieapp.dto.OphimResponse.OphimListResponse;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -12,17 +13,14 @@ import java.util.Map;
 
 @Component
 @Slf4j
+@RequiredArgsConstructor
 public class OPhimClientService {
     private final RestTemplate restTemplate;
-    @Value("${ophim.baseurl}")
-    private String baseUrl;
+    private final OPhimProperties oPhimProperties;
 
-    public OPhimClientService(RestTemplate restTemplate) {
-        this.restTemplate = restTemplate;
-    }
 
     public OphimHomepageResponse getHomepage() {
-        String url = baseUrl + "/home";
+        String url = oPhimProperties.getBaseUrl() + "/home";
         log.info("🔄 Calling Ophim API: {}", url);
 
         try {
@@ -39,7 +37,7 @@ public class OPhimClientService {
     }
 
     public OphimMovieDetailResponse getMovieDetail(String slug) {
-        String url = baseUrl + "/phim/" + slug;
+        String url = oPhimProperties.getBaseUrl() + "/phim/" + slug;
         log.debug("🔄 Calling Ophim API for movie: {}", slug);
 
         try {
@@ -53,7 +51,7 @@ public class OPhimClientService {
     }
 
     public OphimListResponse getListBySlug(String slug, Map<String, String> params) {
-        StringBuilder url = new StringBuilder(baseUrl + "/danh-sach/" + slug);
+        StringBuilder url = new StringBuilder(oPhimProperties.getBaseUrl() + "/danh-sach/" + slug);
         if (params != null && !params.isEmpty()) {
             url.append("?");
             params.forEach((key, value) -> {

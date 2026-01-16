@@ -21,15 +21,15 @@ public class ResLoginDTO {
         private Long id;
         private String email;
         private String username;
-        private String role;
         private String fullName;
         private String avatarUrl;
         private String provider;
         private String providerId;
         private Boolean isActive;
         private Boolean isEmailVerified;
-        private List<String> roles;
-        private String primaryRole;
+        private String role;
+        private Integer rolePriority;
+        private Boolean hasPassword;
     }
 
     @Setter
@@ -46,6 +46,8 @@ public class ResLoginDTO {
         private String providerId;
         private boolean isActive;
         private boolean isEmailVerified;
-        private List<String> roles;
+        private String role;
+        private Integer rolePriority;
+        private Boolean hasPassword;
     }
 }

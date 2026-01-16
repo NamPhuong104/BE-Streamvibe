@@ -12,8 +12,6 @@ import lombok.Setter;
 @AllArgsConstructor
 @NoArgsConstructor
 public class UserUpdateDTO {
-    @NotBlank(message = "username không được có kí tự trắng ở đầu")
-    @NotEmpty(message = "username không dược để trống")
     private String username;
 
     @NotBlank(message = "FullName không được có kí tự trắng ở đầu")
@@ -23,4 +21,5 @@ public class UserUpdateDTO {
     //    @NotBlank(message = "avatarUrl không được có kí tự trắng ở đầu")
 //    @NotEmpty(message = "avatarUrl không được để trống")
     private String avatarUrl;
+    private Long roleId;
 }

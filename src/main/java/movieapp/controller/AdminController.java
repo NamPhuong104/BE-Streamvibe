@@ -14,8 +14,6 @@ import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.ResponseEntity;
 import org.springframework.web.bind.annotation.*;
 
-import java.util.Set;
-
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
@@ -53,22 +51,8 @@ public class AdminController {
     @PutMapping("/users/{id}/roles")
     @RequireSuperAdmin // Override - chỉ SUPER_ADMIN mới được thay đổi roles
     @ApiMessage("Cập nhật roles cho user")
-    public ResUserDTO updateUserRoles(@PathVariable("id") Long id, @RequestBody Set<String> roleNames) {
-        return userService.handleUpdateUserRoles(id, roleNames);
-    }
-
-    @PutMapping("/users/{id}/add-role")
-    @RequireSuperAdmin
-    @ApiMessage("Thêm role cho user")
-    public ResUserDTO addRoleToUser(@PathVariable Long id, @RequestParam String roleName) {
-        return userService.handleAddRoleToUser(id, roleName);
-    }
-
-    @PutMapping("/users/{id}/remove-role")
-    @RequireSuperAdmin
-    @ApiMessage("Xóa role khỏi user")
-    public ResUserDTO removeRoleFromUser(@PathVariable Long id, @RequestParam String roleName) {
-        return userService.handleRemoveRoleFromUser(id, roleName);
+    public ResUserDTO updateUserRoles(@PathVariable("id") Long id, @RequestBody String roleName) {
+        return userService.handleUpdateUserRoles(id, roleName);
     }
 
     // ==================== PREMIUM MANAGEMENT ====================

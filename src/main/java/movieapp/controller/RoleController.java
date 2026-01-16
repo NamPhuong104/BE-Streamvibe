@@ -7,7 +7,9 @@ import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.Role.RoleCreateDTO;
 import movieapp.dto.Role.RoleResponse;
 import movieapp.entity.Role;
+import movieapp.entity.User;
 import movieapp.service.RoleService;
+import movieapp.service.UserService;
 import movieapp.util.annotation.ApiMessage;
 import movieapp.util.annotation.RequireAdmin;
 import movieapp.util.annotation.RequireSuperAdmin;
@@ -19,19 +21,25 @@ import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 @RestController
 @RequestMapping("/admin")
 @RequiredArgsConstructor
-@RequireAdmin
+@RequireSuperAdmin
 public class RoleController {
     private final RoleService roleService;
+    private final UserService userService;
 
     @GetMapping("/roles")
     @ApiMessage("Lấy danh sách roles")
     public ResultPaginationDTO getAllRoles(@Filter Specification spec, Pageable pageable) {
         return roleService.handleGetAllRoles(spec, pageable);
+    }
+
+    @GetMapping("/roles/all")
+    @ApiMessage("Lấy tất cả roles (sorted by priority)")
+    public List<RoleResponse> getAllRolesSorted() {
+        return roleService.handleGetAllRolesSorted();
     }
 
     @GetMapping("/roles/{id}")
@@ -44,27 +52,20 @@ public class RoleController {
     @RequireAdmin
     @ApiMessage("Lấy roles theo priority")
     public List<RoleResponse> getRolesByPriority(
-            @RequestParam(defaultValue = "1") Integer minPriority,
+            @RequestParam(defaultValue = "0") Integer minPriority,
             @RequestParam(defaultValue = "1000") Integer maxPriority) {
         return roleService.handleGetRolesByPriorityRange(minPriority, maxPriority);
     }
 
-    @PutMapping("/default-roles")
-    @ApiMessage("Lấy danh sách role mặc định của user")
-    public Set<Role> getDefaultUserRole(@RequestBody Set<String> names) {
-        return roleService.handleGetDefaultUserRole(names);
-    }
-
-    @PutMapping("/list-roles")
-    @ApiMessage("Lấy danh sách role theo tên")
-    public Set<Role> getManyRoleByName(@RequestBody Set<String> names) {
-        return roleService.handleGetDefaultUserRole(names);
-    }
-
-    @GetMapping("/roles/{name}")
-    @ApiMessage("Kiểm tra role có tồn tại")
-    public boolean existRoleByName(@PathVariable String name) {
-        return roleService.handleExits(name);
+    /**
+     * Lấy danh sách roles có thể assign cho user
+     * (Chỉ trả về roles có priority thấp hơn current user)
+     */
+    @GetMapping("/roles/assignable")
+    @ApiMessage("Lấy danh sách roles có thể assign")
+    public List<RoleResponse> getAssignableRoles() {
+        User currentUser = userService.getCurrentUser();
+        return roleService.handleGetAssignableRoles(currentUser);
     }
 
     @PostMapping("/roles")
@@ -82,15 +83,8 @@ public class RoleController {
     @PostMapping("/roles/{roleId}/clone")
     @RequireSuperAdmin
     @ApiMessage("Clone role")
-    public ResponseEntity<RoleResponse> cloneRole(
-            @PathVariable Long roleId,
-            @RequestBody Map<String, String> body) {
-        String newName = body.get("name");
-        if (newName == null || newName.isBlank()) {
-            throw new IllegalArgumentException("Tên role mới không được để trống");
-        }
-        return ResponseEntity.status(HttpStatus.CREATED)
-                .body(roleService.handleCloneRole(roleId, newName));
+    public ResponseEntity<RoleResponse> cloneRole(@PathVariable Long roleId) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(roleService.handleCloneRole(roleId));
     }
 
     @DeleteMapping("/roles/{roleName}")

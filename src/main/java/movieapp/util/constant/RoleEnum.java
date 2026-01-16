@@ -12,7 +12,7 @@ public enum RoleEnum {
     ROLE_ADMIN("ROLE_ADMIN", "Administrator - Manage users & content", 10, true),
     ROLE_MODERATOR("ROLE_MODERATOR", "Moderator - Manage content only", 50, false),
     ROLE_PREMIUM("ROLE_PREMIUM", "Premium User - Access premium features", 80, false),
-    ROLE_USER("ROLE_USER", "Regular User - Basic access", 100, false);
+    ROLE_USER("ROLE_USER", "Regular User - Basic access", 100, true);
 
     private final String name;
     private final String description;

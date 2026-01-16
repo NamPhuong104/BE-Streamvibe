@@ -10,8 +10,10 @@ import movieapp.entity.User;
 import movieapp.exception.CommonMessageException;
 import movieapp.repository.UserRepository;
 import movieapp.util.SecurityUtil;
+import movieapp.util.UsernameGenerator;
 import movieapp.util.Util;
 import movieapp.util.constant.RoleEnum;
+import movieapp.util.constant.ValidationConstant;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -19,7 +21,10 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.stereotype.Service;
 
 import java.time.LocalDateTime;
-import java.util.*;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Optional;
 import java.util.stream.Collectors;
 
 @Service
@@ -32,6 +37,9 @@ public class UserService {
     private final RoleService roleService;
 
     public ResUserDTO convertToResUserDTO(User user) {
+        String roleName = user.getRoleName();
+        Integer rolePriority = user.getRolePriority();
+
         return ResUserDTO.builder().id(user.getId())
                 .email(user.getEmail())
                 .username(user.getUsername())
@@ -43,8 +51,9 @@ public class UserService {
                 .isEmailVerified(user.getIsEmailVerified())
                 .createdAt(user.getCreatedAt())
                 .updatedAt(user.getUpdatedAt())
-                .roles(user.getRoleNames())
-                .primaryRole(user.getPrimaryRoleName())
+                .role(roleName)
+                .rolePriority(rolePriority)
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                 .build();
     }
 
@@ -82,10 +91,11 @@ public class UserService {
             return userRepository.save(user);
         } else {
             Role userRole = roleService.getDefaultUserRole();
+            String username = generateUniqueUsername(name);
 
             User user = User.builder()
                     .email(email)
-                    .username(name)
+                    .username(username)
                     .fullName(name)
                     .avatarUrl(picture)
                     .provider("GOOGLE")
@@ -93,7 +103,7 @@ public class UserService {
                     .isActive(true)
                     .isEmailVerified(true)
                     .password(null)
-                    .roles(new HashSet<>(Set.of(userRole)))
+                    .role(userRole)
                     .build();
             return userRepository.save(user);
         }
@@ -115,15 +125,26 @@ public class UserService {
         return userRepository.findByEmailOrUsername(emailOrUsername, emailOrUsername).orElse(null);
     }
 
+    public Boolean handleFindByUserName(String username) {
+        return userRepository.existsByUsername(username);
+    }
+
     public ResUserDTO handleCreateUser(UserCreateDTO userReq) {
+        validateUsername(userReq.getUsername());
 
         if (isExistEmail(userReq.getEmail()))
             throw new CommonMessageException("Email " + userReq.getEmail() + " đã tồn tại, vui lòng sử dụng email khác");
 
-        if (userRepository.existsByUsername(userReq.getUsername()))
-            throw new CommonMessageException("Username " + userReq.getUsername() + " đã tồn tại");
+        if (handleFindByUserName(userReq.getUsername()))
+            throw new CommonMessageException("Username " + userReq.getUsername() + " đã tồn tại, vui lòng sử dụng username khác");
 
-        Role userRole = roleService.getDefaultUserRole();
+        Role currentRole;
+
+        if (userReq.getRoleId() != null) {
+            currentRole = roleService.handleFindById(userReq.getRoleId());
+        } else {
+            currentRole = roleService.getDefaultUserRole();
+        }
 
         User newUser = User.builder()
                 .email(userReq.getEmail())
@@ -134,7 +155,7 @@ public class UserService {
                 .provider("LOCAL")
                 .isActive(true)
                 .isEmailVerified(false)
-                .roles(new HashSet<>(Set.of(userRole))) // Set default role
+                .role(currentRole)
                 .build();
 
         String tokenOtp = Util.generateOtp();
@@ -150,20 +171,43 @@ public class UserService {
     }
 
     public User handleGetUserById(long id) {
-        User user = userRepository.findById(id).orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + id));
-        return user;
+        return userRepository.findById(id).orElseThrow(() -> new CommonMessageException("User không tồn tại với id: " + id));
     }
 
     public ResUserDTO handleUpdateUser(long id, UserUpdateDTO userReq) {
         User existingUser = handleGetUserById(id);
 
-        if (existingUser != null) {
-            existingUser.setUsername(userReq.getUsername());
-            existingUser.setAvatarUrl(userReq.getAvatarUrl());
-            existingUser.setFullName(userReq.getFullName());
+        if (userReq.getUsername() != null) {
+            // Validate username mới
+            validateUsername(userReq.getUsername());
+
+            // Check không phải username hiện tại và đã tồn tại
+            if (handleFindByUserName(userReq.getUsername())) {
+                throw new CommonMessageException("Username " + userReq.getUsername() + " đã tồn tại, vui lòng sử dụng username khác");
+            } else {
+                existingUser.setUsername(userReq.getUsername());
+            }
+
+            if (userReq.getAvatarUrl() != null) existingUser.setAvatarUrl(userReq.getAvatarUrl());
+            if (userReq.getFullName() != null) existingUser.setFullName(userReq.getFullName());
+            if (userReq.getRoleId() != null) {
+                Role currentRole = roleService.handleFindById(userReq.getRoleId());
+                existingUser.setRole(currentRole);
+            }
         }
         userRepository.save(existingUser);
         return convertToResUserDTO(existingUser);
+    }
+
+    public ResUserDTO handleUpdateEmail(long id) {
+        User ex = handleGetUserById(id);
+        if (ex != null) {
+            ex.setIsEmailVerified(true);
+            ex.setVerifyEmailToken(null);
+            ex.setVerifyEmailExpiry(null);
+        }
+        userRepository.save(ex);
+        return convertToResUserDTO(ex);
     }
 
     public void handleDeleteUser(Long id) {
@@ -278,6 +322,46 @@ public class UserService {
         userRepository.save(user);
     }
 
+    public void handleCreatePassword(String newPassword, String confirmPassword, String token) {
+        User user = getCurrentUser();
+
+        // Check nếu user đã có password
+        if (user.getPassword() != null && !user.getPassword().isEmpty())
+            throw new CommonMessageException("Tài khoản đã có mật khẩu. Vui lòng sử dụng chức năng đổi mật khẩu.");
+
+        // Check provider
+        if ("LOCAL".equalsIgnoreCase(user.getProvider()))
+            throw new CommonMessageException("Tài khoản LOCAL phải có mật khẩu");
+
+        // Validate password match
+        if (!newPassword.equals(confirmPassword))
+            throw new CommonMessageException("Mật khẩu xác nhận không khớp");
+
+        // Validate password length
+        if (newPassword.length() < ValidationConstant.PASSWORD_MIN_LENGTH)
+            throw new CommonMessageException(
+                    "Mật khẩu phải có ít nhất " + ValidationConstant.PASSWORD_MIN_LENGTH + " ký tự"
+            );
+
+        if (newPassword.length() > ValidationConstant.PASSWORD_MAX_LENGTH)
+            throw new CommonMessageException(
+                    "Mật khẩu không được quá " + ValidationConstant.PASSWORD_MAX_LENGTH + " ký tự"
+            );
+
+        if (token.length() < 0 || token.isEmpty()) throw new CommonMessageException("Token không được để trống");
+
+        if (user.getResetPasswordExpiry() == null || user.getResetPasswordExpiry().isBefore(LocalDateTime.now()))
+            throw new CommonMessageException("Token reset password đã hết hạn");
+
+        // Encode và save
+        String hashed = passwordEncoder.encode(newPassword);
+        user.setPassword(hashed);
+        user.setResetPasswordToken(null);
+        user.setResetPasswordExpiry(null);
+
+        userRepository.save(user);
+    }
+
     // ==================== ROLE MANAGEMENT ====================
     public ResultPaginationDTO handleGetAllUser(Specification<User> spec, Pageable pageable) {
         Page<User> pageUser = userRepository.findAll(spec, pageable);
@@ -299,50 +383,63 @@ public class UserService {
         return rs;
     }
 
-    public ResUserDTO handleUpdateUserRoles(Long userId, Set<String> roleNames) {
+    public ResUserDTO handleUpdateUserRoles(Long userId, String roleName) {
         User user = handleGetUserById(userId);
         User currentUser = getCurrentUser();
 
+        // Validation
         if (user.getId().equals(currentUser.getId()))
             throw new CommonMessageException("Không thể thay đổi role của chính mình");
+
         if (user.isSuperAdmin() && !currentUser.isSuperAdmin())
             throw new CommonMessageException("Không có quyền thay đổi role của Super Admin");
 
-        roleNames.add(RoleEnum.ROLE_USER.getName());
+        // Kiểm tra current user có quyền assign role này không
+        Role newRole = roleService.handleFindByName(roleName);
+        if (!currentUser.canManageRole(newRole)) {
+            throw new CommonMessageException("Bạn không có quyền assign role: " + roleName);
+        }
 
-        Set<Role> newRoles = roleService.handleFindByNames(roleNames);
-        user.setRoles(newRoles);
-        userRepository.save(user);
-        return convertToResUserDTO(user);
-    }
+        // Kiểm tra current user có quyền cao hơn target user không
+        if (!currentUser.hasPrivilegeOver(user)) {
+            throw new CommonMessageException("Bạn không có quyền thay đổi role của user này");
+        }
 
-    public ResUserDTO handleAddRoleToUser(Long userId, String roleName) {
-        User user = handleGetUserById(userId);
-        Role role = roleService.handleFindByName(roleName);
-
-        user.getRoles().add(role);
-        userRepository.save(user);
-
-        return convertToResUserDTO(user);
-    }
-
-    public ResUserDTO handleRemoveRoleFromUser(Long userId, String roleName) {
-        User user = handleGetUserById(userId);
-        if (roleName.equals(RoleEnum.ROLE_USER.getName()))
-            throw new CommonMessageException("Không thể xóa role USER cơ bản");
-
-        user.getRoles().removeIf(role -> role.getName().equals(roleName));
+        // ⭐ Set single role
+        user.setRole(newRole);
         userRepository.save(user);
 
         return convertToResUserDTO(user);
     }
 
     public ResUserDTO handleUpgradeToPremium(Long userId) {
-        return handleAddRoleToUser(userId, RoleEnum.ROLE_PREMIUM.getName());
+        User user = handleGetUserById(userId);
+
+        // Chỉ upgrade nếu user đang là ROLE_USER
+        if (!user.hasRole(RoleEnum.ROLE_USER.getName())) {
+            throw new CommonMessageException("Chỉ có thể upgrade user thường lên Premium");
+        }
+
+        Role premiumRole = roleService.handleFindByName(RoleEnum.ROLE_PREMIUM.getName());
+        user.setRole(premiumRole);
+        userRepository.save(user);
+
+        return convertToResUserDTO(user);
     }
 
     public ResUserDTO handleDowngradeFromPremium(Long userId) {
-        return handleRemoveRoleFromUser(userId, RoleEnum.ROLE_PREMIUM.getName());
+        User user = handleGetUserById(userId);
+
+        // Chỉ downgrade nếu user đang là ROLE_PREMIUM
+        if (!user.hasRole(RoleEnum.ROLE_PREMIUM.getName())) {
+            throw new CommonMessageException("User không phải Premium");
+        }
+
+        Role userRole = roleService.getDefaultUserRole();
+        user.setRole(userRole);
+        userRepository.save(user);
+
+        return convertToResUserDTO(user);
     }
 
     public ResUserDTO handleBanUser(Long userId) {
@@ -392,5 +489,34 @@ public class UserService {
 
         return userRepository.findByEmail(email)
                 .orElseThrow(() -> new CommonMessageException("Không tìm thấy user"));
+    }
+
+    /**
+     * ⭐ Generate unique username, retry nếu trùng
+     */
+    private String generateUniqueUsername(String fullName) {
+        int maxAttempts = 10;
+
+        for (int i = 0; i < maxAttempts; i++) {
+            String username = UsernameGenerator.generateFromName(fullName);
+            if (!userRepository.existsByUsername(username)) {
+                return username;
+            }
+        }
+
+        return "user_" + System.currentTimeMillis();
+    }
+
+    /**
+     * ⭐ Validate username với pattern đồng bộ FE
+     */
+    public void validateUsername(String username) {
+        if (username == null || username.isBlank()) throw new CommonMessageException("Username không được để trống");
+        if (username.length() < ValidationConstant.USERNAME_MIN_LENGTH)
+            throw new CommonMessageException("Username phải có ít nhất " + ValidationConstant.USERNAME_MIN_LENGTH + " ký tự");
+        if (username.length() > ValidationConstant.USERNAME_MAX_LENGTH)
+            throw new CommonMessageException("Username không được quá " + ValidationConstant.USERNAME_MIN_LENGTH + " ký tự");
+        if (!UsernameGenerator.isValidUserName(username))
+            throw new CommonMessageException(ValidationConstant.USERNAME_MESSAGE);
     }
 }

@@ -5,8 +5,8 @@ import jakarta.persistence.*;
 import lombok.*;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
-import java.util.Set;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "roles")
@@ -34,15 +34,58 @@ public class Role {
     @Builder.Default
     private Integer priority = 100;
 
+    @Column(name = "is_system_role")
+    @Builder.Default
+    private Boolean isSystemRole = false;
+
     @Column(name = "created_at")
     private LocalDateTime createdAt;
 
-    @ManyToMany(mappedBy = "roles", fetch = FetchType.LAZY)
+    @OneToMany(mappedBy = "role", fetch = FetchType.LAZY)
     @JsonIgnore
-    private Set<User> users = new HashSet<>();
+    @Builder.Default
+    private List<User> users = new ArrayList<>();
 
     @PrePersist
     protected void onCreate() {
         createdAt = LocalDateTime.now();
+    }
+
+    // ==================== HELPER METHODS ====================
+
+    /**
+     * Check role này có quyền cao hơn hoặc bằng role khác không
+     */
+    public boolean hasPrivilegeOver(Role other) {
+        if (other == null) return true;
+        return this.priority <= other.priority;
+    }
+
+    /**
+     * Check role này có quyền cao hơn hoặc bằng priority level
+     */
+    public boolean hasPrivilegeOver(int priorityLevel) {
+        return this.priority <= priorityLevel;
+    }
+
+    /**
+     * Check có phải admin role không (priority <= 10)
+     */
+    public boolean isAdminRole() {
+        return this.priority != null && this.priority <= 10;
+    }
+
+    /**
+     * Check có phải moderator trở lên không (priority <= 50)
+     */
+    public boolean isModeratorOrAbove() {
+        return this.priority != null && this.priority <= 50;
+    }
+
+    /**
+     * Check có phải premium trở lên không (priority <= 80)
+     */
+    public boolean isPremiumOrAbove() {
+        return this.priority != null && this.priority <= 80;
     }
 }

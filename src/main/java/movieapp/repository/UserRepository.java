@@ -5,6 +5,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
+import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -21,8 +22,6 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     boolean existsByUsername(String username);
 
     Optional<User> findByEmailOrUsername(String email, String username);
-
-    Optional<User> findByUsername(String username);
 
     Optional<User> findByRefreshTokenAndEmail(String refreshToken, String email);
 
@@ -43,4 +42,9 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     long countByIsActiveTrue();
 
     long countByIsEmailVerifiedTrue();
+
+    @Modifying
+    @Transactional
+    @Query("UPDATE User u SET u.role.id = :newRoleId WHERE u.role.id = :oldRoleId")
+    void updateAllUsersRoleByOldRoleId(@Param("oldRoleId") Long oldRoleId, @Param("newRoleId") Long newRoleId);
 }

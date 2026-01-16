@@ -4,7 +4,6 @@ import lombok.RequiredArgsConstructor;
 import movieapp.dto.Auth.ResLoginDTO;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.core.Authentication;
-import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UserDetails;
@@ -16,8 +15,8 @@ import javax.crypto.SecretKey;
 import javax.crypto.spec.SecretKeySpec;
 import java.time.Instant;
 import java.time.temporal.ChronoUnit;
-import java.util.*;
-import java.util.stream.Collectors;
+import java.util.Base64;
+import java.util.Optional;
 
 @Service
 @RequiredArgsConstructor
@@ -55,54 +54,82 @@ public class SecurityUtil {
     /**
      * Lấy danh sách roles của user hiện tại
      */
-    public static List<String> getCurrentUserRoles() {
+    public static Optional<String> getCurrentUserRole() {
         SecurityContext securityContext = SecurityContextHolder.getContext();
         Authentication authentication = securityContext.getAuthentication();
 
-        if (authentication == null) return Collections.emptyList();
+        if (authentication == null) return Optional.empty();
 
         if (authentication.getPrincipal() instanceof Jwt jwt) {
-            Object roleObj = jwt.getClaim("permission");
+            return Optional.ofNullable(jwt.getClaimAsString("role"));
+        }
 
-            if (roleObj instanceof List<?> rolesList) {
-                return rolesList.stream().filter(String.class::isInstance).map(String.class::cast).collect(Collectors.toList());
+        // Fallback: lấy từ authorities (nếu có)
+        return authentication.getAuthorities().stream()
+                .map(auth -> auth.getAuthority())
+                .filter(auth -> auth.startsWith("ROLE_"))
+                .findFirst();
+    }
+
+    //  Lấy role priority của user hiện tại
+    public static Optional<Integer> getCurrentUserRolePriority() {
+        SecurityContext securityContext = SecurityContextHolder.getContext();
+        Authentication authentication = securityContext.getAuthentication();
+
+        if (authentication == null) return Optional.empty();
+
+        if (authentication.getPrincipal() instanceof Jwt jwt) {
+            Object priority = jwt.getClaim("rolePriority");
+            if (priority instanceof Number) {
+                return Optional.of(((Number) priority).intValue());
             }
         }
 
-        return authentication.getAuthorities().stream().map(GrantedAuthority::getAuthority).collect(Collectors.toList());
+        return Optional.empty();
     }
 
     /**
      * Check user hiện tại có role cụ thể không
      */
     public static boolean hasRole(String role) {
-        return getCurrentUserRoles().contains(role);
+        return getCurrentUserRole()
+                .map(currentRole -> currentRole.equals(role))
+                .orElse(false);
+    }
+
+    // Check user có minimum priority không
+    public static boolean hasMinimumPriority(int requiredPriority) {
+        return getCurrentUserRolePriority()
+                .map(priority -> priority <= requiredPriority)
+                .orElse(false);
     }
 
     /**
-     * Check user hiện tại có một trong các roles không
-     */
-    public static boolean hasAnyRole(String... roles) {
-        List<String> currentRoles = getCurrentUserRoles();
-        return Arrays.stream(roles).anyMatch(currentRoles::contains);
-    }
-
-    /**
-     * Check user hiện tại có phải Admin không
+     * Check user hiện tại có phải Admin không (priority <= 10)
      */
     public static boolean isAdmin() {
-        return hasAnyRole("ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+        return hasMinimumPriority(10);
     }
 
     /**
-     * Check user hiện tại có phải Super Admin không
+     * Check user hiện tại có phải Super Admin không (priority <= 0)
      */
     public static boolean isSuperAdmin() {
-        return hasRole("ROLE_SUPER_ADMIN");
+        return hasMinimumPriority(0);
+    }
+
+    // Check user có phải Moderator trở lên không (priority <= 50)
+    public static boolean isModerator() {
+        return hasMinimumPriority(50);
+    }
+
+    // Check user có phải Premium trở lên không (priority <= 80)
+    public static boolean isPremium() {
+        return hasMinimumPriority(80);
     }
 
     // 1. Tạo Access Token
-    public String createAccessToken(String email, ResLoginDTO dto, List<String> roles) {
+    public String createAccessToken(String email, ResLoginDTO dto) {
         ResLoginDTO.UserInsideToken userToken = new ResLoginDTO.UserInsideToken();
         userToken.setId(dto.getUser().getId());
         userToken.setEmail(dto.getUser().getEmail());
@@ -112,28 +139,26 @@ public class SecurityUtil {
         userToken.setProviderId(dto.getUser().getProviderId());
         userToken.setActive(dto.getUser().getIsActive());
         userToken.setEmailVerified(dto.getUser().getIsEmailVerified());
-        userToken.setRoles(roles);
+        userToken.setRole(dto.getUser().getRole());
+        userToken.setRolePriority(dto.getUser().getRolePriority());
 
         Instant now = Instant.now();
         Instant validity = now.plus(accessTokenExpiration, ChronoUnit.SECONDS);
 
         // Hardcode tạm quyền (sau này lấy từ DB)
-        List<String> authorities = roles != null && !roles.isEmpty() ? roles : List.of("ROLE_USER");
+        String role = dto.getUser().getRole() != null ? dto.getUser().getRole() : "ROLE_USER";
 
         JwtClaimsSet claims = JwtClaimsSet.builder()
                 .issuedAt(now)
                 .expiresAt(validity)
                 .subject(email)
                 .claim("user", userToken) // Lưu thông tin user vào token
-                .claim("permission", authorities) // Lưu quyền vào token
+                .claim("role", role) // Lưu quyền vào token
+                .claim("rolePriority", dto.getUser().getRolePriority())
+                .claim("permission", role)
                 .build();
         JwsHeader jwsHeader = JwsHeader.with(JWT_ALGORITHM).build();
         return this.jwtEncoder.encode(JwtEncoderParameters.from(jwsHeader, claims)).getTokenValue();
-    }
-
-    @Deprecated
-    public String createAccessToken(String email, ResLoginDTO dto) {
-        return createAccessToken(email, dto, List.of("ROLE_USER"));
     }
 
     // 2. Tạo Refresh Token

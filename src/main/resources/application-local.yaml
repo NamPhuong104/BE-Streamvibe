@@ -17,7 +17,15 @@ spring:
 
   jpa:
     show-sql: true
+    defer-datasource-initialization: true
+    hibernate:
+      ddl-auto: update
 
+  sql:
+    init:
+      mode: always  # ⬅️ Luôn chạy init script
+      schema-locations: classpath:schema.sql
+      continue-on-error: true
   # ===================================
   # REDIS - LOCAL
   # ===================================
@@ -73,3 +81,4 @@ logging:
     com.movieapp: DEBUG
     org.hibernate.SQL: DEBUG
     # org.hibernate.type.descriptor.sql.BasicBinder: TRACE  # Show SQL params
+    com.turkraft.springfilter: DEBUG

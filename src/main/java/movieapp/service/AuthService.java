@@ -19,8 +19,6 @@ import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 
-import java.util.List;
-
 @Service
 @RequiredArgsConstructor
 public class AuthService {
@@ -125,8 +123,8 @@ public class AuthService {
     }
 
     private LoginResult buildLoginResult(User user, String email) {
-        List<String> roleNames = user.getRoleNames();
-        String primaryRole = user.getPrimaryRoleName();
+        String roleName = user.getRoleName();
+        Integer rolePriority = user.getRolePriority();
 
         ResLoginDTO.UserLogin userLogin = ResLoginDTO.UserLogin.builder()
                 .id(user.getId())
@@ -138,14 +136,15 @@ public class AuthService {
                 .providerId(user.getProviderId())
                 .isActive(user.getIsActive())
                 .isEmailVerified(user.getIsEmailVerified())
-                .roles(roleNames)
-                .primaryRole(primaryRole)
+                .role(roleName)
+                .rolePriority(rolePriority)
+                .hasPassword(user.getPassword() != null && !user.getPassword().isEmpty())
                 .build();
 
         ResLoginDTO res = new ResLoginDTO();
         res.setUser(userLogin);
 
-        String accessToken = securityUtil.createAccessToken(email, res, roleNames);
+        String accessToken = securityUtil.createAccessToken(email, res);
         res.setAccessToken(accessToken);
 
         String refreshToken = securityUtil.createRefreshToken(email, res);

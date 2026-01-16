@@ -36,6 +36,7 @@ public class AuthController {
     private final AuthenticationManagerBuilder authenticationManagerBuilder;
     private final SecurityUtil securityUtil;
     private final UserService userService;
+
     @Value("${jwt.refresh-token-validity-in-seconds}")
     private Long refreshTokenExpiration;
     @Value("${google.client-id}")
@@ -154,6 +155,12 @@ public class AuthController {
     @ApiMessage("Đổi email thành công")
     public void confirmChangeEmail(@Valid @RequestParam("token") String token) {
         authService.handleConfirmChangeEmail(token);
+    }
+
+    @PostMapping("/create-password")
+    @ApiMessage("Tạo mật khẩu thành công")
+    public void createPassword(@Valid @RequestBody CreatePasswordDTO dto) {
+        userService.handleCreatePassword(dto.getNewPassword(), dto.getConfirmPassword(), dto.getToken());
     }
 
     private ResponseEntity<ResLoginDTO> buildLoginResponse(LoginResult result) {

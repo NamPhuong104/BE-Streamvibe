@@ -265,8 +265,8 @@ public class WatchHistoryService {
 
     @Transactional
     public void handleDeleteAllWatchHistoryByUserId(Long userId) {
-        if (!watchHistoryRepository.existsByUserId(userId))
-            throw new CommonMessageException("Watch History không tồn tại với userId: " + userId);
+//        if (!watchHistoryRepository.existsByUserId(userId))
+//            throw new CommonMessageException("Watch History không tồn tại với userId: " + userId);
         watchHistoryRepository.deleteAllHistoryByUserId(userId);
     }
 

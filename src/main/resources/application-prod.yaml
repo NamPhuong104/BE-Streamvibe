@@ -17,6 +17,15 @@ spring:
 
   jpa:
     show-sql: false
+    hibernate:
+      ddl-auto: none
+    defer-datasource-initialization: true
+
+  sql:
+    init:
+      mode: always
+      schema-locations: classpath:schema.sql
+      continue-on-error: true
 
   # ===================================
   # REDIS - PRODUCTION

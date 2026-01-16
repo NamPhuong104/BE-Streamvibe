@@ -25,22 +25,29 @@ public class UserController {
 
     @GetMapping
     @ApiMessage("Get All Users")
-    public ResponseEntity<ResultPaginationDTO> getAllUsers(@Filter Specification<User> spec, Pageable pageable) {
-        return ResponseEntity.status(HttpStatus.OK).body(userService.handleGetAllUser(spec, pageable));
+    public ResultPaginationDTO getAllUsers(@Filter Specification<User> spec, Pageable pageable) {
+        return userService.handleGetAllUser(spec, pageable);
+    }
+
+    @GetMapping("/check/{username}")
+    @ApiMessage("Check Exist Username")
+    public Boolean checkUsername(@Valid @PathVariable String username) {
+        return userService.handleFindByUserName(username);
     }
 
     @GetMapping("/{id}")
     @ApiMessage("Get User By ID")
-    public ResponseEntity<ResUserDTO> getUserById(@PathVariable("id") long id) {
+
+    public ResUserDTO getUserById(@PathVariable("id") long id) {
         User user = userService.handleGetUserById(id);
         if (user == null) throw new CommonMessageException("User với id:  " + id + " không tồn tại !!!!!");
-        return ResponseEntity.status(HttpStatus.OK).body(userService.convertToResUserDTO(user));
+        return userService.convertToResUserDTO(user);
     }
 
     @GetMapping("/email/{email}")
     @ApiMessage("Get User By Email")
-    public ResponseEntity<ResUserDTO> getUserByEmail(@Valid @PathVariable("email") String email) {
-        return ResponseEntity.ok(userService.handleFindUserByEmail(email));
+    public ResUserDTO getUserByEmail(@Valid @PathVariable("email") String email) {
+        return userService.handleFindUserByEmail(email);
     }
 
     @PostMapping
@@ -52,8 +59,14 @@ public class UserController {
 
     @PutMapping("/{id}")
     @ApiMessage("Update User")
-    public ResponseEntity<ResUserDTO> updateUser(@Valid @PathVariable("id") long id, @Valid @RequestBody UserUpdateDTO user) {
-        return ResponseEntity.ok(userService.handleUpdateUser(id, user));
+    public ResUserDTO updateUser(@Valid @PathVariable("id") long id, @Valid @RequestBody UserUpdateDTO user) {
+        return userService.handleUpdateUser(id, user);
+    }
+
+    @PutMapping("/email-verification/{id}")
+    @ApiMessage("Email Verification")
+    public ResUserDTO verificationEmail(@Valid @PathVariable("id") long id) {
+        return userService.handleUpdateEmail(id);
     }
 
     @DeleteMapping("/{id}")

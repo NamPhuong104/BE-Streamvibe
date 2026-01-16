@@ -1,14 +1,13 @@
 package movieapp.entity;
 
 import com.fasterxml.jackson.annotation.JsonIgnore;
+import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import jakarta.persistence.*;
 import lombok.*;
+import movieapp.util.constant.RoleEnum;
 
 import java.time.LocalDateTime;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 @Entity
 @Table(name = "users", indexes = {
@@ -26,7 +25,11 @@ import java.util.stream.Collectors;
 
         // 4. Change Email Token - dùng cho đổi email
         // Query: findByChangeEmailToken
-        @Index(name = "idx_user_change_email_token", columnList = "change_email_token")
+        @Index(name = "idx_user_change_email_token", columnList = "change_email_token"),
+
+        // 5. Find RoleId - dùng cho tìm role
+        // Query: findByRoleId
+        @Index(name = "idx_user_role_id", columnList = "role_id")
 })
 @Getter
 @Setter
@@ -102,10 +105,10 @@ public class User {
     @JsonIgnore
     private List<Playlist> playlists;
 
-    @ManyToMany(fetch = FetchType.EAGER)
-    @JoinTable(name = "user_roles", joinColumns = @JoinColumn(name = "user_id"), inverseJoinColumns = @JoinColumn(name = "role_id"))
-    @Builder.Default
-    private Set<Role> roles = new HashSet<>();
+    @ManyToOne(fetch = FetchType.EAGER)
+    @JoinColumn(name = "role_id", nullable = false)
+    @JsonIgnoreProperties({"users", "hibernateLazyInitializer", "handler"})
+    private Role role;
 
     @PrePersist
     protected void onCreate() {
@@ -117,76 +120,90 @@ public class User {
         updatedAt = LocalDateTime.now();
     }
 
-    // ==================== HELPER METHODS ====================
+    // ==================== HELPER METHODS (ĐƠN GIẢN HÓA) ====================
 
     /**
-     * Lấy danh sách tên roles
+     * Lấy tên role
      */
-    public List<String> getRoleNames() {
-        if (roles == null) return List.of();
-        return roles.stream().map(Role::getName).collect(Collectors.toList());
+    public String getRoleName() {
+        return role != null ? role.getName() : RoleEnum.ROLE_USER.getName();
+    }
+
+    /**
+     * Lấy priority của role
+     */
+    public Integer getRolePriority() {
+        return role != null ? role.getPriority() : RoleEnum.ROLE_USER.getPriority();
     }
 
     /**
      * Check user có role cụ thể không
      */
     public boolean hasRole(String roleName) {
-        if (roles == null) return false;
-        return roles.stream().anyMatch(role -> role.getName().equals(roleName));
+        return role != null && role.getName().equals(roleName);
     }
 
     /**
-     * Check user có một trong các roles không
+     * Check user có role với priority <= level không
+     * (priority thấp = quyền cao)
      */
-    public boolean hasAnyRole(String... roleNames) {
-        if (roles == null) return false;
-        Set<String> targetRoles = Set.of(roleNames);
-        return roles.stream().anyMatch(role -> targetRoles.contains(role.getName()));
+    public boolean hasMinimumPriority(int priorityLevel) {
+        return role != null && role.getPriority() <= priorityLevel;
     }
 
     /**
-     * Check user có phải Admin không (ADMIN hoặc SUPER_ADMIN)
+     * Check user có phải Admin không (ADMIN hoặc SUPER_ADMIN, priority <= 10)
      */
     public boolean isAdmin() {
-        return hasAnyRole("ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+        return hasMinimumPriority(RoleEnum.ROLE_ADMIN.getPriority());
     }
 
     /**
      * Check user có phải Super Admin không
      */
     public boolean isSuperAdmin() {
-        return hasRole("ROLE_SUPER_ADMIN");
+        return hasRole(RoleEnum.ROLE_SUPER_ADMIN.getName());
     }
 
     /**
-     * Check user có phải Premium trở lên không
-     */
-    public boolean isPremium() {
-        return hasAnyRole("ROLE_PREMIUM", "ROLE_MODERATOR", "ROLE_ADMIN", "ROLE_SUPER_ADMIN");
-    }
-
-    /**
-     * Check user có phải Moderator trở lên không
+     * Check user có phải Moderator trở lên không (priority <= 50)
      */
     public boolean isModerator() {
-        return hasAnyRole("ROLE_MODERATOR", "ROLE_ADMIN", "ROLE_SUPER_ADMIN");
+        return hasMinimumPriority(RoleEnum.ROLE_MODERATOR.getPriority());
     }
 
     /**
-     * Lấy role có quyền cao nhất (priority nhỏ nhất)
+     * Check user có phải Premium trở lên không (priority <= 80)
      */
-    public Role getHighestRole() {
-        if (roles == null || roles.isEmpty()) return null;
-        return roles.stream()
-                .min((r1, r2) -> r1.getPriority().compareTo(r2.getPriority()))
-                .orElse(null);
+    public boolean isPremium() {
+        return hasMinimumPriority(RoleEnum.ROLE_PREMIUM.getPriority());
     }
 
     /**
-     * Lấy tên role chính (role cao nhất)
+     * Check user có quyền cao hơn user khác không
      */
-    public String getPrimaryRoleName() {
-        Role highest = getHighestRole();
-        return highest != null ? highest.getName() : "ROLE_USER";
+    public boolean hasPrivilegeOver(User other) {
+        if (other == null || other.getRole() == null) return true;
+        if (this.role == null) return false;
+        return this.role.getPriority() < other.getRole().getPriority();
+    }
+
+    /**
+     * Check user có quyền cao hơn hoặc bằng user khác không
+     */
+    public boolean hasPrivilegeOverOrEqual(User other) {
+        if (other == null || other.getRole() == null) return true;
+        if (this.role == null) return false;
+        return this.role.getPriority() <= other.getRole().getPriority();
+    }
+
+    /**
+     * Check user có quyền quản lý role này không
+     * (Chỉ có thể quản lý roles có priority cao hơn - số lớn hơn)
+     */
+    public boolean canManageRole(Role targetRole) {
+        if (targetRole == null) return true;
+        if (this.role == null) return false;
+        return this.role.getPriority() < targetRole.getPriority();
     }
 }

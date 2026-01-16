@@ -22,6 +22,7 @@ public class ResUserDTO {
     private Boolean isEmailVerified;
     private LocalDateTime createdAt;
     private LocalDateTime updatedAt;
-    private List<String> roles;
-    private String primaryRole;
+    private String role;
+    private Integer rolePriority;
+    private Boolean hasPassword;
 }

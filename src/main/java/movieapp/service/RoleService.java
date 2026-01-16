@@ -8,20 +8,23 @@ import movieapp.entity.Role;
 import movieapp.entity.User;
 import movieapp.exception.CommonMessageException;
 import movieapp.repository.RoleRepository;
+import movieapp.repository.UserRepository;
+import movieapp.util.UsernameGenerator;
 import movieapp.util.constant.RoleEnum;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Set;
 import java.util.stream.Collectors;
 
 @Service
 @RequiredArgsConstructor
 public class RoleService {
     private final RoleRepository roleRepository;
+    private final UserRepository userRepository;
 
     public Role handleFindByName(String name) {
         return roleRepository.findByName(name).orElseThrow(() -> new CommonMessageException("Role không tồn tại: " + name));
@@ -35,12 +38,11 @@ public class RoleService {
         return handleFindByName(RoleEnum.ROLE_USER.getName());
     }
 
-    public Set<Role> handleGetDefaultUserRole(Set<String> names) {
-        Set<Role> roles = roleRepository.findByNameIn(names);
-        if (roles.size() != names.size()) throw new CommonMessageException("Một số role không tồn tại");
-
-        return roles;
+    public boolean handleExists(String name) {
+        return roleRepository.existsByName(name);
     }
+
+    // ==================== GET ALL ====================
 
     public ResultPaginationDTO handleGetAllRoles(Specification<Role> spec, Pageable pageable) {
         Page<Role> pageRole = roleRepository.findAll(spec, pageable);
@@ -55,41 +57,36 @@ public class RoleService {
 
         rs.setMeta(mt);
 //        rs.setResult(pageRole.getContent());
-        List<RoleResponse> dtoRole = pageRole.getContent().stream().map(item -> convertToRoleResponse(item)).collect(Collectors.toList());
+        List<RoleResponse> dtoRole = pageRole.getContent().stream().map(this::convertToRoleResponse).collect(Collectors.toList());
         rs.setResult(dtoRole);
 
         return rs;
     }
 
-    public Set<Role> handleFindByNames(Set<String> names) {
-        Set<Role> roles = roleRepository.findByNameIn(names);
-        if (roles.size() != names.size()) {
-            throw new CommonMessageException("Một số role không tồn tại");
-        }
-        return roles;
+    public List<RoleResponse> handleGetAllRolesSorted() {
+        return roleRepository.findAllByOrderByPriorityAsc().stream().map(this::convertToRoleResponse).collect(Collectors.toList());
     }
 
-    public boolean handleExits(String name) {
-        return roleRepository.existsByName(name);
+    public List<RoleResponse> handleGetRolesByPriorityRange(Integer minPriority, Integer maxPriority) {
+        return roleRepository.findByPriorityBetween(minPriority, maxPriority)
+                .stream()
+                .map(this::convertToRoleResponse)
+                .collect(Collectors.toList());
     }
-
 
     public RoleResponse handleCreateRole(RoleCreateDTO dto) {
-        String roleName = dto.getName().toUpperCase().trim();
-
-        if (!roleName.startsWith("ROLE_")) {
-            roleName = "ROLE_" + roleName;
-        }
+        String roleName = normalizeRoleName(dto.getName());
 
         if (roleRepository.existsByName(roleName)) throw new CommonMessageException("Role đã tồn tại: " + roleName);
-
         if (dto.getPriority() != null && dto.getPriority() <= 0)
             throw new CommonMessageException("Priority phải > 0. Priority <= 0 dành cho system roles.");
+
 
         Role newRole = Role.builder()
                 .name(roleName)
                 .description(dto.getDescription())
                 .priority(dto.getPriority() != null ? dto.getPriority() : 100)
+                .isSystemRole(false)
                 .build();
 
         Role saved = roleRepository.save(newRole);
@@ -98,85 +95,125 @@ public class RoleService {
     }
 
     public Role handleUpdateRole(Long roleId, String newName, String newDescription, Integer newPriority) {
-        Role role = roleRepository.findById(roleId)
-                .orElseThrow(() -> new CommonMessageException("Role không tồn tại với id: " + roleId));
+        Role role = handleFindById(roleId);
 
-        // Cập nhật thông tin
-        if (newName != null && !newName.isBlank()) {
-            // Check tên mới không trùng với role khác
-            if (roleRepository.existsByName(newName) && !role.getName().equals(newName)) {
-                throw new CommonMessageException("Role name đã tồn tại: " + newName);
+        // Check system role protection
+        if (Boolean.TRUE.equals(role.getIsSystemRole())) {
+            if (newName != null && !newName.equals(role.getName())) {
+                throw new CommonMessageException("Không thể đổi tên system role: " + role.getName());
             }
-            role.setName(newName);
+            if (newPriority != null && !newPriority.equals(role.getPriority())) {
+                throw new CommonMessageException("Không thể đổi priority của system role: " + role.getName());
+            }
         }
 
+        // Update name
+        if (newName != null && !newName.isBlank()) {
+            String normalizedName = normalizeRoleName(newName);
+            if (!role.getName().equals(normalizedName) && roleRepository.existsByName(normalizedName)) {
+                throw new CommonMessageException("Role name đã tồn tại: " + normalizedName);
+            }
+            role.setName(normalizedName);
+        }
+
+        // Update description
         if (newDescription != null) {
             role.setDescription(newDescription);
         }
 
+        // Update priority
         if (newPriority != null) {
+            if (newPriority <= 0) {
+                throw new CommonMessageException("Priority phải > 0");
+            }
             role.setPriority(newPriority);
         }
 
         return roleRepository.save(role);
     }
 
+    @Transactional
     public void handleDeleteRole(String roleName) {
-        if (roleName.equals(RoleEnum.ROLE_USER.getName()))
-            throw new CommonMessageException("Không thể xóa role USER cơ bản");
+        Role role = roleRepository.findByName(roleName)
+                .orElseThrow(() -> new CommonMessageException("Role không tồn tại: " + roleName));
 
-        Role role = roleRepository.findByName(roleName).orElseThrow(() -> new CommonMessageException("Role không tồn tại: " + roleName));
-
-        for (User user : role.getUsers()) {
-            user.getRoles().remove(role);
+        // Không cho xóa system roles
+        if (Boolean.TRUE.equals(role.getIsSystemRole())) {
+            throw new CommonMessageException("Không thể xóa system role: " + roleName);
         }
 
+
+        Role defaultRole = getDefaultUserRole();
+
+        // ⭐ Kiểm tra có user nào đang dùng role này không
+//        Long userCount = roleRepository.countUsersByRoleId(role.getId());
+//        if (userCount > 0) {
+//            throw new CommonMessageException(
+//                    String.format("Không thể xóa role '%s' vì đang có %d user sử dụng. " +
+//                            "Vui lòng chuyển users sang role khác trước.", roleName, userCount)
+//            );
+//        }
+        userRepository.updateAllUsersRoleByOldRoleId(role.getId(), defaultRole.getId());
         roleRepository.delete(role);
     }
 
-    //    ==================== HELPER METHODS ====================
-    public RoleResponse convertToRoleResponse(Role role) {
-        return RoleResponse.builder()
-                .id(role.getId())
-                .name(role.getName())
-                .description(role.getDescription())
-                .priority(role.getPriority())
-                .isSystemRole(RoleEnum.isSystemRole(role.getName()))
-                .userCount(roleRepository.countUsersByRoleId(role.getId()))
-                .createdAt(role.getCreatedAt())
-                .build();
-    }
+    // ==================== SPECIAL METHODS ====================
 
-    //    Lấy danh sách roles theo priority range
-    public List<RoleResponse> handleGetRolesByPriorityRange(Integer minPriority, Integer maxPriority) {
-        return roleRepository.findByPriorityBetween(minPriority, maxPriority)
+    /**
+     * Lấy danh sách roles mà user có quyền assign cho người khác
+     */
+    public List<RoleResponse> handleGetAssignableRoles(User currentUser) {
+        if (currentUser == null || currentUser.getRole() == null) {
+            return List.of();
+        }
+
+        // User chỉ có thể assign roles có priority cao hơn (số lớn hơn) role của mình
+        return roleRepository.findAssignableRoles(currentUser.getRolePriority())
                 .stream()
                 .map(this::convertToRoleResponse)
                 .collect(Collectors.toList());
     }
 
-    //    Clone role (tạo role mới từ role có sẵn)
-    public RoleResponse handleCloneRole(Long sourceRoleId, String newName) {
+    public RoleResponse handleCloneRole(Long sourceRoleId) {
         Role source = handleFindById(sourceRoleId);
-
-        String roleName = newName.toUpperCase().trim();
-        if (!roleName.startsWith("ROLE_")) {
-            roleName = "ROLE_" + roleName;
-        }
+        String roleName = UsernameGenerator.generateFromName(source.getName());
 
         if (roleRepository.existsByName(roleName)) {
             throw new CommonMessageException("Role đã tồn tại: " + roleName);
         }
 
         Role newRole = Role.builder()
-                .name(roleName)
+                .name(roleName.toUpperCase())
                 .description("Cloned from: " + source.getName() + ". " +
                         (source.getDescription() != null ? source.getDescription() : ""))
-                .priority(source.getPriority() + 1) // Priority thấp hơn 1 bậc
+                .priority(source.getPriority() + 1)
+                .isSystemRole(false)
                 .build();
 
         Role saved = roleRepository.save(newRole);
 
         return convertToRoleResponse(saved);
+    }
+
+
+    //    ==================== HELPER METHODS ====================
+    private String normalizeRoleName(String name) {
+        String roleName = name.toUpperCase().trim();
+        if (!roleName.startsWith("ROLE_")) {
+            roleName = "ROLE_" + roleName;
+        }
+        return roleName;
+    }
+
+    public RoleResponse convertToRoleResponse(Role role) {
+        return RoleResponse.builder()
+                .id(role.getId())
+                .name(role.getName())
+                .description(role.getDescription())
+                .priority(role.getPriority())
+                .isSystemRole(role.getIsSystemRole())
+                .userCount(roleRepository.countUsersByRoleId(role.getId()))
+                .createdAt(role.getCreatedAt())
+                .build();
     }
 }

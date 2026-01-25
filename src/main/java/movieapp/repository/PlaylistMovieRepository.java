@@ -60,4 +60,12 @@ public interface PlaylistMovieRepository extends JpaRepository<PlaylistMovie, Lo
             WHERE pm.playlist.id = :playlistId AND pm.playlist.user.id = :userId
             """)
     void deleteAllMovieByPlaylistIdAndUserId(@Param("playlistId") Long playlistId, @Param("userId") Long id);
+
+    // ==================== DASHBOARD STATISTICS ====================
+    // Tổng số movies trong tất cả playlists
+    long count();
+
+    @Query("SELECT COUNT (DISTINCT pm.movieSlug) FROM PlaylistMovie pm")
+    long countUniqueMovies();
+
 }

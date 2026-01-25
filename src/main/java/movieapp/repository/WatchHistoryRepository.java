@@ -1,5 +1,7 @@
 package movieapp.repository;
 
+import movieapp.dto.Dashboard.DailyCountProjection;
+import movieapp.dto.Dashboard.TopWatchedProjection;
 import movieapp.entity.WatchHistory;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
@@ -8,6 +10,7 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 import org.springframework.stereotype.Repository;
 
+import java.time.LocalDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -76,4 +79,73 @@ public interface WatchHistoryRepository extends JpaRepository<WatchHistory, Long
     @Modifying
     @Query("DELETE FROM WatchHistory wh WHERE wh.user.id = :userId")
     void deleteAllHistoryByUserId(@Param("userId") Long userId);
+
+    // ==================== DASHBOARD STATISTICS ====================
+
+    /**
+     * Top watched movies - CÓ filter theo thời gian
+     */
+    @Query(value = """
+            SELECT 
+                movie_slug as movieSlug,
+                movie_name as movieName,
+                origin_name as originName,
+                poster_url as posterUrl,
+                thumb_url as thumbUrl,
+                COUNT(DISTINCT user_id) as viewCount,
+                COALESCE(SUM(watch_time), 0) as totalWatchTime
+            FROM watch_history
+            WHERE last_watched_at >= :since
+            GROUP BY movie_slug, movie_name, origin_name, poster_url, thumb_url
+            ORDER BY viewCount DESC, totalWatchTime DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<TopWatchedProjection> findTopWatchedMoviesSince(
+            @Param("since") LocalDateTime since,
+            @Param("limit") int limit
+    );
+
+    /**
+     * Top watched movies - KHÔNG filter (ALL time)
+     */
+    @Query(value = """
+            SELECT 
+                movie_slug as movieSlug,
+                movie_name as movieName,
+                origin_name as originName,
+                poster_url as posterUrl,
+                thumb_url as thumbUrl,
+                COUNT(DISTINCT user_id) as viewCount,
+                COALESCE(SUM(watch_time), 0) as totalWatchTime
+            FROM watch_history
+            GROUP BY movie_slug, movie_name, origin_name, poster_url, thumb_url
+            ORDER BY viewCount DESC, totalWatchTime DESC
+            LIMIT :limit
+            """, nativeQuery = true)
+    List<TopWatchedProjection> findTopWatchedMoviesAll(@Param("limit") int limit);
+
+    // Tổng thời gian xem (seconds)
+    @Query("SELECT COALESCE(SUM(wh.currentTime), 0) FROM WatchHistory wh")
+    long getTotalWatchTime();
+
+    // Số lần xem hoàn thành
+    long countByCompletedTrue();
+
+    // Tỷ lệ hoàn thành trung bình
+    @Query("SELECT COALESCE(AVG(wh.progressPercent), 0) FROM WatchHistory wh")
+    double getAvgCompletionRate();
+
+    // Đếm unique movies
+    @Query("SELECT COUNT (DISTINCT wh.movieSlug) FROM WatchHistory wh")
+    long countUniqueMovies();
+
+    // Đếm watches theo ngày
+    @Query(value = """
+            SELECT DATE(last_watched_at) as date, COUNT(*) as count
+            FROM watch_history
+            WHERE last_watched_at >= :since
+            GROUP BY DATE(last_watched_at)
+            ORDER BY date ASC
+            """, nativeQuery = true)
+    List<DailyCountProjection> countDailyWatches(@Param("since") LocalDateTime since);
 }

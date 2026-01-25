@@ -19,4 +19,8 @@ public interface PlaylistRepository extends JpaRepository<Playlist, Long>, JpaSp
     void deletePlaylistByUserIdAndPlaylistId(@Param("userId") Long userId, @Param("playlistId") Long playlistId);
 
     long countByUserId(Long userId);
+
+    // ==================== DASHBOARD STATISTICS ====================
+
+    long count();
 }

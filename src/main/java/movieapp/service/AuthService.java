@@ -1,6 +1,7 @@
 package movieapp.service;
 
 import com.google.api.client.googleapis.auth.oauth2.GoogleIdToken;
+import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
 import movieapp.dto.Auth.ReqLoginDTO;
 import movieapp.dto.Auth.ResLoginDTO;
@@ -18,6 +19,7 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
+import org.springframework.web.bind.annotation.RequestParam;
 
 @Service
 @RequiredArgsConstructor

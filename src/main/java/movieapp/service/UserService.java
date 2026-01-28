@@ -15,6 +15,7 @@ import movieapp.util.Util;
 import movieapp.util.constant.RoleEnum;
 import movieapp.util.constant.ValidationConstant;
 import org.springframework.data.domain.Page;
+import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -123,6 +124,27 @@ public class UserService {
 
     public User handleFindUserByEmailOrUsername(String emailOrUsername) {
         return userRepository.findByEmailOrUsername(emailOrUsername, emailOrUsername).orElse(null);
+    }
+
+    public ResultPaginationDTO handleSearchUserByEmailOrUsername(String query, int page, int size) {
+        Pageable pageable = PageRequest.of(page - 1, size);
+        Page<User> pageUsers = userRepository.searchByEmailOrUsername(query, pageable);
+
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
+
+        mt.setPage(page);
+        mt.setPageSize(size);
+        mt.setPages(pageUsers.getTotalPages());
+        mt.setTotal(pageUsers.getTotalElements());
+
+        rs.setMeta(mt);
+
+        List<ResUserDTO> listUser = pageUsers.getContent().stream().map(this::convertToResUserDTO).collect(Collectors.toList());
+
+        rs.setResult(listUser);
+
+        return rs;
     }
 
     public Boolean handleFindByUserName(String username) {

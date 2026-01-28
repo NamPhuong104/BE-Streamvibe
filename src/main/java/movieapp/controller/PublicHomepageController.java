@@ -27,7 +27,7 @@ public class PublicHomepageController {
 
 
     @GetMapping(value = {"/homepage", "/homepage/{group}"})
-    public ResponseEntity<HomepageGroupResponse> getHomepageGrouped(
+    public HomepageGroupResponse getHomepageGrouped(
             @PathVariable(required = false) String group) {
 
         String resolvedGroup = (group == null || group.isBlank()) ? "initial" : group.toLowerCase();
@@ -45,7 +45,7 @@ public class PublicHomepageController {
         long duration = System.currentTimeMillis() - startTime;
         log.info("📤 Returning group {} in {}ms", group, duration);
 
-        return ResponseEntity.ok(response);
+        return response;
     }
 
     @GetMapping("/fullHomepage")

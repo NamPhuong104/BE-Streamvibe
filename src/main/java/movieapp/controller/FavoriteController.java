@@ -25,33 +25,33 @@ public class FavoriteController {
 
     @GetMapping
     @ApiMessage("Get All Favorites")
-    public ResponseEntity<ResultPaginationDTO> getAllFavorite(@Filter Specification<Favorite> spec, Pageable pageable) {
-        return ResponseEntity.status(HttpStatus.OK).body(favoriteService.handleGetAllFavorite(spec, pageable));
+    public ResultPaginationDTO getAllFavorite(@Filter Specification<Favorite> spec, Pageable pageable) {
+        return favoriteService.handleGetAllFavorite(spec, pageable);
     }
 
     @GetMapping("/me")
     @ApiMessage("Get Favorite By Me")
-    public ResponseEntity<ResultPaginationDTO> getFavoriteByMe(Pageable pageable) {
-        return ResponseEntity.status(HttpStatus.OK).body(favoriteService.handleGetFavoriteByMe(pageable));
+    public ResultPaginationDTO getFavoriteByMe(Pageable pageable) {
+        return favoriteService.handleGetFavoriteByMe(pageable);
     }
 
     @GetMapping("/me/checkIsExist/{movieSlug}")
     @ApiMessage("Check Is Exits Favorite By Movie Slug")
-    public ResponseEntity<Boolean> getIsFavoriteByMovieSlug(@PathVariable String movieSlug) {
-        return ResponseEntity.status(200).body(favoriteService.handleCheckIsFavorite(movieSlug));
+    public Boolean getIsFavoriteByMovieSlug(@PathVariable String movieSlug) {
+        return favoriteService.handleCheckIsFavorite(movieSlug);
     }
 
     @DeleteMapping("/me/{movieSlug}")
     @ApiMessage("Delete By Movie Slug")
-    public ResponseEntity<Void> deleteBySlug(@PathVariable String movieSlug) {
+    public Void deleteBySlug(@PathVariable String movieSlug) {
         favoriteService.handleDeleteByMovieSlug(movieSlug);
-        return ResponseEntity.ok(null);
+        return null;
     }
 
     @GetMapping("/{id}")
     @ApiMessage("Get Favorite By Id")
-    public ResponseEntity<FavoriteRes> getFavoriteById(@PathVariable("id") long id) {
-        return ResponseEntity.ok(favoriteService.handleGetFavoriteById(id));
+    public FavoriteRes getFavoriteById(@PathVariable("id") long id) {
+        return favoriteService.handleGetFavoriteById(id);
     }
 
 
@@ -63,14 +63,14 @@ public class FavoriteController {
 
     @PatchMapping
     @ApiMessage("Update Favorite")
-    public ResponseEntity<FavoriteRes> updateFavorite(@RequestBody FavoriteUpdateReq dto) {
-        return ResponseEntity.ok().body(favoriteService.handleUpdateFavorite(dto));
+    public FavoriteRes updateFavorite(@RequestBody FavoriteUpdateReq dto) {
+        return favoriteService.handleUpdateFavorite(dto);
     }
 
     @DeleteMapping("/{id}")
     @ApiMessage("Delete Favorite")
-    public ResponseEntity<Void> deleteFavorite(@PathVariable("id") Long id) {
+    public Void deleteFavorite(@PathVariable("id") Long id) {
         favoriteService.handleDeleteFavorite(id);
-        return ResponseEntity.ok(null);
+        return null;
     }
 }

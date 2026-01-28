@@ -25,35 +25,35 @@ public class PlaylistController {
 
     @GetMapping("/me")
     @ApiMessage("Get PlayList By Me")
-    public ResponseEntity<ResultPaginationDTO> getPlaylistByMe(Pageable page) {
-        return ResponseEntity.status(200).body(playlistService.handleGetPlaylistByMe(page));
+    public ResultPaginationDTO getPlaylistByMe(Pageable page) {
+        return playlistService.handleGetPlaylistByMe(page);
     }
 
     @PostMapping("/me")
     @ApiMessage("Create Playlist By Me")
-    public PlaylistResponse createPlaylistByMe(@Valid @RequestBody PlaylistCreateDTO dto) {
-        return playlistService.handleCreatePlaylistByMe(dto);
+    public ResponseEntity<PlaylistResponse> createPlaylistByMe(@Valid @RequestBody PlaylistCreateDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(playlistService.handleCreatePlaylistByMe(dto));
     }
 
     @DeleteMapping("/me/{id}")
     @ApiMessage("Delete Playlist By Me")
-    public ResponseEntity<Void> deletePlaylistByMe(@PathVariable("id") Long id) {
+    public Void deletePlaylistByMe(@PathVariable("id") Long id) {
         playlistService.handleDeletePlaylistByMe(id);
-        return ResponseEntity.ok(null);
+        return null;
     }
 
 
     //  ADMIN
     @GetMapping
     @ApiMessage("Get All Playlists")
-    public ResponseEntity<ResultPaginationDTO> getAllPlaylist(@Filter Specification<Playlist> spec, Pageable pageable) {
-        return ResponseEntity.status(HttpStatus.OK).body(playlistService.handleGetAllPlaylist(spec, pageable));
+    public ResultPaginationDTO getAllPlaylist(@Filter Specification<Playlist> spec, Pageable pageable) {
+        return playlistService.handleGetAllPlaylist(spec, pageable);
     }
 
     @GetMapping("/{id}")
     @ApiMessage("Get Playlist By Id")
-    public ResponseEntity<PlaylistResponse> getPlaylistById(@Valid @PathVariable("id") Long id) {
-        return ResponseEntity.ok(playlistService.handleGetPlaylistById(id));
+    public PlaylistResponse getPlaylistById(@Valid @PathVariable("id") Long id) {
+        return playlistService.handleGetPlaylistById(id);
     }
 
     @PostMapping
@@ -65,15 +65,15 @@ public class PlaylistController {
 
     @PutMapping
     @ApiMessage("Update Playlist")
-    public ResponseEntity<PlaylistResponse> updatePlaylist(@Valid @RequestBody PlayListUpdateDTO dto) {
-        return ResponseEntity.ok(playlistService.handleUpdatePlaylist(dto));
+    public PlaylistResponse updatePlaylist(@Valid @RequestBody PlayListUpdateDTO dto) {
+        return playlistService.handleUpdatePlaylist(dto);
     }
 
     @DeleteMapping("/{id}")
     @ApiMessage("Delete Playlist")
-    public ResponseEntity<Void> deletePlaylist(@Valid @PathVariable("id") Long id) {
+    public Void deletePlaylist(@Valid @PathVariable("id") Long id) {
         playlistService.handleDeletePlaylist(id);
-        return ResponseEntity.ok(null);
+        return null;
     }
 
 }

@@ -208,6 +208,7 @@ public class FavoriteService {
             FavoriteRes.ResUserDTO userDTO = new FavoriteRes.ResUserDTO();
             userDTO.setId(fav.getUser().getId());
             userDTO.setEmail(fav.getUser().getEmail());
+            userDTO.setUsername(fav.getUser().getUsername());
             res.setUser(userDTO);
         }
         return res;

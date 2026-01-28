@@ -15,7 +15,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
+import org.springframework.security.core.userdetails.UsernameNotFoundException;
 import org.springframework.web.bind.annotation.*;
+
+import java.util.List;
+import java.util.stream.Collectors;
 
 @RestController
 @RequiredArgsConstructor
@@ -48,6 +52,14 @@ public class UserController {
     @ApiMessage("Get User By Email")
     public ResUserDTO getUserByEmail(@Valid @PathVariable("email") String email) {
         return userService.handleFindUserByEmail(email);
+    }
+
+    @GetMapping("/search")
+    @ApiMessage("Search User By Email Or Username")
+    public ResultPaginationDTO searchUsers(@RequestParam("q") String query, @RequestParam(defaultValue = "1") int page, @RequestParam(defaultValue = "20") int size) {
+        ResultPaginationDTO result = userService.handleSearchUserByEmailOrUsername(query, page, size);
+
+        return result;
     }
 
     @PostMapping

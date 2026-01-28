@@ -2,6 +2,8 @@ package movieapp.repository;
 
 import movieapp.dto.Dashboard.DailyCountProjection;
 import movieapp.entity.User;
+import org.springframework.data.domain.Page;
+import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.JpaSpecificationExecutor;
 import org.springframework.data.jpa.repository.Modifying;
@@ -33,6 +35,14 @@ public interface UserRepository extends JpaRepository<User, Long>, JpaSpecificat
     Optional<User> findByVerifyEmailToken(String token);
 
     Optional<User> findByChangeEmailToken(String token);
+
+    @Query("""
+            SELECT u FROM User u
+            WHERE LOWER(u.email) LIKE LOWER(CONCAT('%', :query, '%'))
+            OR LOWER(u.username) LIKE LOWER(CONCAT('%', :query, '%'))
+            ORDER BY u.email ASC
+            """)
+    Page<User> searchByEmailOrUsername(@Param("query") String query, Pageable pageable);
 
     @Modifying
     @Transactional

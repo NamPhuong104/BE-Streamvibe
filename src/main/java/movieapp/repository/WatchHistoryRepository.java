@@ -65,7 +65,7 @@ public interface WatchHistoryRepository extends JpaRepository<WatchHistory, Long
     Optional<WatchHistory> findLastedByUserAndMovie(@Param("userId") Long userId, @Param("movieSlug") String movieSlug);
 
     @Query("SELECT COUNT(DISTINCT wh.movieSlug) FROM WatchHistory wh WHERE wh.user.id = :userId")
-    long countDistincMoviesByUserId(@Param("userId") Long userId);
+    long countDistinctMoviesByUserId(@Param("userId") Long userId);
 
     //    Check user có trong bảng ko
     boolean existsByUserId(Long id);
@@ -79,6 +79,41 @@ public interface WatchHistoryRepository extends JpaRepository<WatchHistory, Long
     @Modifying
     @Query("DELETE FROM WatchHistory wh WHERE wh.user.id = :userId")
     void deleteAllHistoryByUserId(@Param("userId") Long userId);
+
+
+    /**
+     * Summary view: Lấy record MỚI NHẤT của mỗi cặp (user + movie)
+     */
+    @Query(value = """
+            SELECT wh.* FROM watch_history wh
+                  INNER JOIN (
+                            SELECT user_id, movie_slug, MAX(last_watched_at) as max_time
+                            FROM watch_history
+                            GROUP BY user_id, movie_slug
+                           ) latest ON wh.user_id = latest.user_id
+                                    AND wh.movie_slug = latest.movie_slug
+                                    AND wh.last_watched_at = latest.max_time
+                                    ORDER BY wh.last_watched_at DESC
+                                    LIMIT :limit OFFSET :offset
+            """,
+            nativeQuery = true)
+    List<WatchHistory> findLatestPeruserAndMovie(@Param("limit") int limit, @Param("offset") int offset);
+
+    /**
+     * Đếm tổng số cặp unique (user, movie) cho summary view
+     */
+    @Query(value = """
+            SELECT COUNT(*) FROM (
+               SELECT DISTINCT user_id, movie_slug FROM watch_history
+            ) as unique_pairs
+            """, nativeQuery = true)
+    long countUniqueUserMoviePairs();
+
+    /**
+     * Đếm số tập đã xem của 1 user cho 1 movie
+     */
+    @Query("SELECT COUNT(wh) FROM WatchHistory wh WHERE wh.user.id = :userId AND wh.movieSlug = :movieSlug")
+    int countEpisodesByUserAndMovie(@Param("userId") Long userId, @Param("movieSlug") String movieSlug);
 
     // ==================== DASHBOARD STATISTICS ====================
 

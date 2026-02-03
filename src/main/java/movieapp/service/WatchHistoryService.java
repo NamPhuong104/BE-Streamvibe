@@ -7,6 +7,7 @@ import movieapp.dto.OphimResponse.OphimMovieDetail;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
 import movieapp.dto.WatchHistory.WatchHistoryCreateReq;
 import movieapp.dto.WatchHistory.WatchHistoryRes;
+import movieapp.dto.WatchHistory.WatchHistorySummaryRes;
 import movieapp.dto.WatchHistory.WatchHistoryUpdateReq;
 import movieapp.entity.OptimizedImage;
 import movieapp.entity.User;
@@ -74,6 +75,41 @@ public class WatchHistoryService {
         return rs;
     }
 
+    public ResultPaginationDTO handleGetWatchHistorySummary(Pageable pageable) {
+        int page = pageable.getPageNumber();
+        int size = pageable.getPageSize();
+        int offset = page * size;
+
+        List<WatchHistory> historyList = watchHistoryRepository.findLatestPeruserAndMovie(size, offset);
+
+        long total = watchHistoryRepository.countUniqueUserMoviePairs();
+
+        List<String> slugs = historyList.stream().map(WatchHistory::getMovieSlug).distinct().toList();
+        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
+
+        List<WatchHistorySummaryRes> dtoList = historyList.stream().map(history -> {
+                    WatchHistorySummaryRes res = convertToSummaryRes(history, imageMap);
+                    int episodeCount = watchHistoryRepository.countEpisodesByUserAndMovie(history.getUser().getId(), history.getMovieSlug());
+                    res.setEpisodeCount(episodeCount);
+
+                    return res;
+                }
+        ).collect(Collectors.toList());
+
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
+
+        mt.setPage(page + 1);
+        mt.setPageSize(size);
+        mt.setPages((int) Math.ceil((double) total / size));
+        mt.setTotal(total);
+
+        rs.setMeta(mt);
+        rs.setResult(dtoList);
+
+        return rs;
+    }
+
     //    * ⭐ Lấy lịch sử xem - MỖI PHIM CHỈ HIỆN 1 LẦN (tập mới nhất)
     public ResultPaginationDTO handleGetWatchHistoryByMe(Pageable pageable) {
         String email = SecurityUtil.getCurrentUserLogin().orElseThrow(() -> new CommonMessageException("Bạn chưa đăng nhập"));
@@ -86,7 +122,7 @@ public class WatchHistoryService {
         List<WatchHistory> historyList = watchHistoryRepository.findLatestEpisodePerMovieNative(currentUser.getId(), size, offset);
 
 //        Count total movie unique
-        long total = watchHistoryRepository.countDistincMoviesByUserId(currentUser.getId());
+        long total = watchHistoryRepository.countDistinctMoviesByUserId(currentUser.getId());
 
         List<String> slugs = historyList.stream().map(WatchHistory::getMovieSlug).distinct().toList();
 
@@ -236,9 +272,12 @@ public class WatchHistoryService {
         if (dto.getMovieSlug() != null) history.setMovieSlug(util.emptyToNull(dto.getMovieSlug()));
         if (dto.getMovieName() != null) history.setMovieName(util.emptyToNull(dto.getMovieName()));
         if (dto.getMovieType() != null) history.setMovieType(util.emptyToNull(dto.getMovieType()));
+        if (dto.getOriginName() != null) history.setOriginName(util.emptyToNull(dto.getOriginName()));
         if (dto.getEpisodeSlug() != null) history.setEpisodeSlug(util.emptyToNull(dto.getEpisodeSlug()));
         if (dto.getEpisodeName() != null) history.setEpisodeName(util.emptyToNull(dto.getEpisodeName()));
         if (dto.getServerName() != null) history.setServerName(util.emptyToNull(dto.getServerName()));
+        if (dto.getPosterUrl() != null) history.setPosterUrl(util.emptyToNull(dto.getPosterUrl()));
+        if (dto.getThumbUrl() != null) history.setThumbUrl(util.emptyToNull(dto.getThumbUrl()));
 
 
         if (dto.getCurrentTime() != null && dto.getDuration() != null) {
@@ -307,7 +346,50 @@ public class WatchHistoryService {
         if (history.getUser() != null) {
             res.setUser(new WatchHistoryRes.ResUserDTO(
                     history.getUser().getId(),
-                    history.getUser().getEmail()
+                    history.getUser().getEmail(),
+                    history.getUser().getUsername()
+            ));
+        }
+
+        return res;
+    }
+
+    private WatchHistorySummaryRes convertToSummaryRes(WatchHistory history,
+                                                       Map<String, Map<String, OptimizedImage>> imageMap) {
+        WatchHistorySummaryRes res = new WatchHistorySummaryRes();
+
+        res.setId(history.getId());
+        res.setMovieSlug(history.getMovieSlug());
+        res.setMovieName(history.getMovieName());
+        res.setOriginName(history.getOriginName());
+        res.setMovieType(history.getMovieType());
+
+        res.setEpisodeSlug(history.getEpisodeSlug());
+        res.setEpisodeName(history.getEpisodeName());
+        res.setServerName(history.getServerName());
+
+        res.setCurrentTime(history.getCurrentTime());
+        res.setDuration(history.getDuration());
+        res.setProgressPercent(history.getProgressPercent());
+        res.setCompleted(history.getCompleted());
+
+        res.setPosterUrl(history.getPosterUrl());
+        res.setThumbUrl(history.getThumbUrl());
+
+        res.setCurrentTimeFormatted(util.formatTime(history.getCurrentTime()));
+        res.setDurationFormatted(util.formatTime(history.getDuration()));
+        res.setLastWatchedAt(history.getLastWatchedAt());
+        res.setCreatedAt(history.getCreatedAt());
+        res.setUpdatedAt(history.getUpdatedAt());
+
+        // Set ảnh từ imageMap
+        setImagesFromMap(res, history.getMovieSlug(), imageMap);
+
+        if (history.getUser() != null) {
+            res.setUser(new WatchHistoryRes.ResUserDTO(
+                    history.getUser().getId(),
+                    history.getUser().getEmail(),
+                    history.getUser().getUsername()
             ));
         }
 

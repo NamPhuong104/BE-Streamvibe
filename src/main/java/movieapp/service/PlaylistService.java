@@ -144,7 +144,8 @@ public class PlaylistService {
         if (data.getUser() != null) {
             playlistRes.setUser(new PlaylistResponse.ResUserDTO(
                     data.getUser().getId(),
-                    data.getUser().getEmail()
+                    data.getUser().getEmail(),
+                    data.getUser().getUsername()
             ));
         }
 

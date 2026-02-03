@@ -24,31 +24,37 @@ public class WatchHistoryController {
 
     @GetMapping("/me")
     @ApiMessage("Get watch history by me")
-    public ResponseEntity<ResultPaginationDTO> getWatchHistoryByMe(Pageable pageable) {
-        return ResponseEntity.status(200).body(watchHistoryService.handleGetWatchHistoryByMe(pageable));
+    public ResultPaginationDTO getWatchHistoryByMe(Pageable pageable) {
+        return watchHistoryService.handleGetWatchHistoryByMe(pageable);
     }
 
     @GetMapping("/me/progress/{movieSlug}")
     @ApiMessage("Get watch progress")
-    public ResponseEntity<WatchHistoryRes> getWatchProgress(
+    public WatchHistoryRes getWatchProgress(
             @PathVariable String movieSlug,
             @RequestParam(required = false) String episodeSlug
     ) {
-        return ResponseEntity.ok(watchHistoryService.getWatchProgress(movieSlug, episodeSlug));
+        return watchHistoryService.getWatchProgress(movieSlug, episodeSlug);
     }
 
     @DeleteMapping("/me/{movieSlug}")
     @ApiMessage("Delete Watch History By Movie Slug")
-    public ResponseEntity<Void> deleteWatchHistoryBySlug(@PathVariable String movieSlug) {
+    public Void deleteWatchHistoryBySlug(@PathVariable String movieSlug) {
         watchHistoryService.handleDeleteWatchHistoryBySlug(movieSlug);
-        return ResponseEntity.ok().body(null);
+        return null;
     }
 
 
     @GetMapping
     @ApiMessage("Get watch history")
-    public ResponseEntity<ResultPaginationDTO> getAllWatchHistory(@Filter Specification<WatchHistory> spec, Pageable pageable) {
-        return ResponseEntity.ok(watchHistoryService.handleGetAllWatchHistory(spec, pageable));
+    public ResultPaginationDTO getAllWatchHistory(@Filter Specification<WatchHistory> spec, Pageable pageable) {
+        return watchHistoryService.handleGetAllWatchHistory(spec, pageable);
+    }
+
+    @GetMapping("/summary")
+    @ApiMessage("Get watch history summary (grouped by user + movie)")
+    public ResultPaginationDTO getWatchHistorySummary(Pageable pageable) {
+        return watchHistoryService.handleGetWatchHistorySummary(pageable);
     }
 
     @PostMapping
@@ -59,21 +65,21 @@ public class WatchHistoryController {
 
     @PutMapping
     @ApiMessage("Update Watch History")
-    public ResponseEntity<WatchHistoryRes> updateWatchHistory(@Valid @RequestBody WatchHistoryUpdateReq dto) {
-        return ResponseEntity.ok(watchHistoryService.handleUpdateWatchHistory(dto));
+    public WatchHistoryRes updateWatchHistory(@Valid @RequestBody WatchHistoryUpdateReq dto) {
+        return watchHistoryService.handleUpdateWatchHistory(dto);
     }
 
     @DeleteMapping("/{id}")
     @ApiMessage("Delete Watch History")
-    public ResponseEntity<Void> deleteWatchHistory(@Valid @PathVariable("id") Long id) {
+    public Void deleteWatchHistory(@Valid @PathVariable("id") Long id) {
         watchHistoryService.handleDeleteWatchHistory(id);
-        return ResponseEntity.ok(null);
+        return null;
     }
 
     @DeleteMapping("/user/{id}")
     @ApiMessage("Delete All Watch History By UserId")
-    public ResponseEntity<Void> deleteAllWatchHistoryByUserId(@Valid @PathVariable("id") Long id) {
+    public Void deleteAllWatchHistoryByUserId(@Valid @PathVariable("id") Long id) {
         watchHistoryService.handleDeleteAllWatchHistoryByUserId(id);
-        return ResponseEntity.ok(null);
+        return null;
     }
 }

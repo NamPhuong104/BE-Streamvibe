@@ -112,6 +112,31 @@ public class PlaylistMovieService {
         return rs;
     }
 
+    public ResultPaginationDTO handleGetMoviesByPlaylistId(Long playlistId, Pageable pageable) {
+        if (!playlistRepository.existsById(playlistId))
+            throw new CommonMessageException("Playlist không tồn tại với id: " + playlistId);
+
+        Page<PlaylistMovie> pagePm = playlistMovieRepository.findByPlaylistIdOrderByAddedAtDesc(playlistId, pageable);
+
+        List<String> slugs = pagePm.getContent().stream().map(PlaylistMovie::getMovieSlug).distinct().collect(Collectors.toList());
+        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
+
+        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(pm -> convertToPlaylistMovieRes(pm, imageMap)).collect(Collectors.toList());
+
+        ResultPaginationDTO rs = new ResultPaginationDTO();
+        ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
+
+        mt.setPage(pageable.getPageNumber() + 1);
+        mt.setPageSize(pageable.getPageSize());
+        mt.setPages(pagePm.getTotalPages());
+        mt.setTotal(pagePm.getTotalElements());
+
+        rs.setMeta(mt);
+        rs.setResult(dtoList);
+
+        return rs;
+    }
+
     @Transactional
     public PlaylistMovieRes handleCreateMovieByMe(PlaylistMovieCreateDTO data) {
         User currentUser = userService.getCurrentUser();
@@ -177,47 +202,42 @@ public class PlaylistMovieService {
     }
 
 
-//    public PlaylistMovieRes handleCreatePlaylistMovie(PlaylistMovieCreateDTO data) throws IdInvalidException {
-//        User currentUser = userService.getCurrentUser();
-//
-//        Playlist newPlaylist = playlistRepository.findById(data.getPlaylistId())
-//                .orElseThrow(() -> new IdInvalidException("Playlist không tồn tại với id: " + data.getPlaylistId()));
-//
-//        // Check playlist có thuộc về user không
-//        if (!newPlaylist.getUser().getId().equals(currentUser.getId())) {
-//            throw new IdInvalidException("Bạn không có quyền thêm vào playlist này");
-//        }
-//
-//        // ⭐ Check phim đã có trong playlist nào chưa
-//        Optional<PlaylistMovie> existingMovie = playlistMovieRepository
-//                .findByUserIdAndMovieSlug(currentUser.getId(), data.getMovieSlug());
-//
-//        if (existingMovie.isPresent()) {
-//            PlaylistMovie existing = existingMovie.get();
-//            Playlist oldPlaylist = existing.getPlaylist();
-//
-//            // Nếu đã có trong cùng playlist → không làm gì
-//            if (oldPlaylist.getId() == newPlaylist.getId()) {
-//                throw new IdInvalidException("Phim đã có trong playlist này");
-//            }
-//
-//            // ⭐ Xóa khỏi playlist cũ
-//            playlistMovieRepository.delete(existing);
-//            oldPlaylist.setMovieCount(Math.max(0, oldPlaylist.getMovieCount() - 1));
-//            playlistRepository.save(oldPlaylist);
-//        }
-//
-//        // Thêm vào playlist mới
-//        PlaylistMovie pm = buildPlaylistMovie(newPlaylist, data);
-//        playlistMovieRepository.save(pm);
-//
-//        newPlaylist.setMovieCount(newPlaylist.getMovieCount() + 1);
-//        playlistRepository.save(newPlaylist);
-//
-//        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(List.of(data.getMovieSlug()));
-//
-//        return convertToPlaylistMovieRes(pm, imageMap);
-//    }
+    public PlaylistMovieRes handleCreatePlaylistMovie(PlaylistMovieCreateDTO data) {
+        User currentUser = userService.getCurrentUser();
+
+        Playlist newPlaylist = playlistRepository.findById(data.getPlaylistId())
+                .orElseThrow(() -> new CommonMessageException("Playlist không tồn tại với id: " + data.getPlaylistId()));
+
+        // ⭐ Check phim đã có trong playlist nào chưa
+        Optional<PlaylistMovie> existingMovie = playlistMovieRepository
+                .findByUserIdAndMovieSlug(currentUser.getId(), data.getMovieSlug());
+
+        if (existingMovie.isPresent()) {
+            PlaylistMovie existing = existingMovie.get();
+            Playlist oldPlaylist = existing.getPlaylist();
+
+            // Nếu đã có trong cùng playlist → không làm gì
+            if (oldPlaylist.getId() == newPlaylist.getId()) {
+                throw new CommonMessageException("Phim đã có trong playlist này");
+            }
+
+            // ⭐ Xóa khỏi playlist cũ
+            playlistMovieRepository.delete(existing);
+            oldPlaylist.setMovieCount(Math.max(0, oldPlaylist.getMovieCount() - 1));
+            playlistRepository.save(oldPlaylist);
+        }
+
+        // Thêm vào playlist mới
+        PlaylistMovie pm = buildPlaylistMovie(newPlaylist, data);
+        playlistMovieRepository.save(pm);
+
+        newPlaylist.setMovieCount(newPlaylist.getMovieCount() + 1);
+        playlistRepository.save(newPlaylist);
+
+        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(List.of(data.getMovieSlug()));
+
+        return convertToPlaylistMovieRes(pm, imageMap);
+    }
 
     public void handleDeletePlaylistMovie(Long id) {
         Optional<PlaylistMovie> pm = playlistMovieRepository.findById(id);

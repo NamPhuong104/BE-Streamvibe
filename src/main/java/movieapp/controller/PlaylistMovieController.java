@@ -35,7 +35,7 @@ public class PlaylistMovieController {
     }
 
     @GetMapping("/me/{playlistId}")
-    @ApiMessage("Get Playlist Movie In My Playlist")
+    @ApiMessage("Get Movie In My Playlist")
     public ResultPaginationDTO getMovieInMyPlaylist(@PathVariable Long playlistId, Pageable pageable) {
         return playlistMovieService.handleGetMovieInMyPlaylist(playlistId, pageable);
     }
@@ -59,11 +59,17 @@ public class PlaylistMovieController {
         return playlistMovieService.handleGetAllPlaylistMovie(spec, pageable);
     }
 
-//    @PostMapping
-//    @ApiMessage("Create Playlist Movie")
-//    public ResponseEntity<PlaylistMovieRes> createPlaylistMovie(@Valid @RequestBody PlaylistMovieCreateDTO dto) throws IdInvalidException {
-//        return ResponseEntity.status(HttpStatus.CREATED).body(playlistMovieService.handleCreatePlaylistMovie(dto));
-//    }
+    @GetMapping("/playlist/{playlistId}")
+    @ApiMessage("Get Playlist Movie In My Playlist")
+    public ResultPaginationDTO getMoviesByPlaylistId(@PathVariable Long playlistId, Pageable pageable) {
+        return playlistMovieService.handleGetMoviesByPlaylistId(playlistId, pageable);
+    }
+
+    @PostMapping
+    @ApiMessage("Create Playlist Movie")
+    public ResponseEntity<PlaylistMovieRes> createPlaylistMovie(@Valid @RequestBody PlaylistMovieCreateDTO dto) {
+        return ResponseEntity.status(HttpStatus.CREATED).body(playlistMovieService.handleCreatePlaylistMovie(dto));
+    }
 
     @DeleteMapping("/{id}")
     @ApiMessage("Delete Playlist Movie")

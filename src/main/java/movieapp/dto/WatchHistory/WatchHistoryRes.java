@@ -42,5 +42,6 @@ public class WatchHistoryRes {
     public static class ResUserDTO {
         private Long id;
         private String email;
+        private String username;
     }
 }

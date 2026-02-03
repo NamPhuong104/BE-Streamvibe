@@ -11,7 +11,10 @@ public class WatchHistoryUpdateReq {
     private Long userId;
     private String movieSlug;
     private String movieName;
+    private String originName;
     private String movieType;
+    private String thumbUrl;
+    private String posterUrl;
     private String episodeSlug;
     private String episodeName;
     private String serverName;

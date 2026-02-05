@@ -3,6 +3,8 @@ package movieapp.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import movieapp.config.properties.OPhimProperties;
+import movieapp.dto.MovieDetail.OphimActorApiResponse;
+import movieapp.dto.MovieDetail.OphimActorData;
 import movieapp.dto.OphimResponse.OphimHomepageResponse;
 import movieapp.dto.OphimResponse.OphimListResponse;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
@@ -71,6 +73,17 @@ public class OPhimClientService {
         } catch (Exception e) {
             log.error("❌ Error calling Ophim API {}: {}", url, e.getMessage());
             throw new RuntimeException("Failed to fetch list: " + slug, e);
+        }
+    }
+
+    public OphimActorData getMovieActors(String slug) {
+        String url = oPhimProperties.getBaseUrl() + "/phim/" + slug + "/peoples";
+        try {
+            OphimActorApiResponse response = restTemplate.getForObject(url, OphimActorApiResponse.class);
+            return response != null && response.isSuccess() ? response.getData() : null;
+        } catch (Exception e) {
+            log.error("⚠\uFE0F Failed to fetch actors for {}: {}", url, e.getMessage());
+            return null;
         }
     }
 }

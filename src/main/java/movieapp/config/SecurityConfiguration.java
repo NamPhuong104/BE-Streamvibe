@@ -36,7 +36,7 @@ public class SecurityConfiguration {
     private final CustomAuthenticationEntryPoint customAuthenticationEntryPoint;
     private final CustomAccessDeniedHandler customAccessDeniedHandler;
     private final AppConfig appConfig;
-    
+
 
     @Bean
     public SecurityFilterChain securityFilterChain(HttpSecurity http, CustomAuthenticationEntryPoint customAuthenticationEntryPoint) throws Exception {
@@ -48,6 +48,7 @@ public class SecurityConfiguration {
                 "/api/v1/auth/reset-password", "/api/v1/auth/verify-email",
                 "/api/v1/auth/change-email/confirm", "/api/v1/auth/resend-verify-email",
                 "/api/v1/homepage/**", "/api/v1/fullHomepage",
+                "/api/v1/movies/*/detail",
                 "/api/v1/health",
         };
 

@@ -63,8 +63,8 @@ public class BlockedKeywordController {
 
     @DeleteMapping("/{id}")
     @ApiMessage("Xóa từ khóa bị chặn thành công")
-    public ResponseEntity<Void> delete(@PathVariable Long id) {
+    public Void delete(@PathVariable Long id) {
         blockedKeywordService.delete(id);
-        return ResponseEntity.noContent().build();
+        return null;
     }
 }

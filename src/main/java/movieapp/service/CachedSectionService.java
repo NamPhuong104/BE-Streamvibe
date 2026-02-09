@@ -243,12 +243,11 @@ public class CachedSectionService {
 
     @Cacheable(value = "homepage", key = "'section7'")
     public List<MovieItemDTO> fetchSection7() {
-        log.info("📥 Fetching Section 7 (Horror Thai)...");
+        log.info("📥 Fetching Section 7 (Horror)...");
         Map<String, String> params = new HashMap<>();
         params.put("sort_field", "year");
         params.put("sort_type", "desc");
         params.put("category", "kinh-di");
-        params.put("country", "thai-lan");
         return fetchListSectionWithFilter("phim-moi", params, DEFAULT_LIMIT);
     }
 

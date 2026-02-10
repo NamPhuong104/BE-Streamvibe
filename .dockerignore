@@ -13,7 +13,7 @@ target/
 
 # Docker
 Dockerfile
-docker-compose.yml
+docker-compose.local.yml
 .dockerignore
 
 # Env

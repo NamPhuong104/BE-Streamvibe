@@ -1,0 +1,113 @@
+version: "3.8"
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: streamvibe-redis-local
+    restart: unless-stopped
+    ports:
+      - "6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: [ "CMD", "redis-cli", "ping" ]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - streamvibe-network
+
+
+    # ============= UMAMI ANALYTICS =============
+  umami:
+    image: umami-custom:local
+    container_name: streamvibe-umami-local
+    restart: unless-stopped
+    ports:
+      - "3001:3000"
+    environment:
+      DATABASE_URL: postgresql://umami:umami123@umami-db:5432/umami
+      DATABASE_TYPE: postgresql
+      APP_SECRET: my-super-secret-umami-key-local-dev-12345
+      DISABLE_TELEMETRY: 1
+    depends_on:
+      umami-db:
+        condition: service_healthy
+    healthcheck:
+      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:3000/api/heartbeat || exit 1" ]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - streamvibe-network
+
+    # ============= UMAMI DATABASE =============
+  umami-db:
+    image: postgres:15-alpine
+    container_name: streamvibe-umami-db-local
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: umami
+      POSTGRES_USER: umami
+      POSTGRES_PASSWORD: umami123
+    volumes:
+      - umami-db-local-data:/var/lib/postgresql/data
+    healthcheck:
+      test: [ "CMD-SHELL", "pg_isready -U umami -d umami" ]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - streamvibe-network
+
+#  backend:
+#    build:
+#      context: .
+#      dockerfile: Dockerfile
+#    container_name: streamvibe-backend-local
+#    restart: unless-stopped
+#    ports:
+#      - "8080:8080"
+#    dns:
+#      - 8.8.8.8
+#      - 8.8.4.4
+#    environment:
+#      SPRING_DATASOURCE_URL: jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:6543/postgres?sslmode=require
+#      SPRING_DATASOURCE_USERNAME: postgres.xjyzgieluqxlccfdpyvu
+#      SPRING_DATASOURCE_PASSWORD: ${SUPABASE_DB_PASSWORD}
+#      SPRING_DATA_REDIS_HOST: redis
+#      SPRING_DATA_REDIS_PORT: 6379
+#      CLOUDINARY_CLOUD_NAME: ${CLOUDINARY_CLOUD_NAME:-ddpbhytdh}
+#      CLOUDINARY_API_KEY: ${CLOUDINARY_API_KEY:-142387517415863}
+#      CLOUDINARY_API_SECRET: ${CLOUDINARY_API_SECRET}
+#      OPHIM_BASEURL: https://ophim1.com/v1/api
+#      OPHIM_FULL_URL_IMAGE: https://img.ophim.live/uploads/movies
+#      APP_IMAGE_ENABLE_CLOUDINARY: "true"
+#      JAVA_OPTS: -Xms512m -Xmx1024m
+#      SPRING_DATASOURCE_HIKARI_MAXIMUM_POOL_SIZE: 5
+#      SPRING_DATASOURCE_HIKARI_MINIMUM_IDLE: 2
+#      SPRING_DATASOURCE_HIKARI_CONNECTION_TIMEOUT: 60000
+#      SPRING_DATASOURCE_HIKARI_IDLE_TIMEOUT: 300000
+#      SPRING_DATASOURCE_HIKARI_MAX_LIFETIME: 600000
+#    depends_on:
+#      redis:
+#        condition: service_healthy
+#    healthcheck:
+#      test: [ "CMD-SHELL", "wget --no-verbose --tries=1 --spider http://localhost:8080/api/v1/health || exit 1" ]
+#      interval: 30s
+#      timeout: 10s
+#      retries: 5
+#      start_period: 120s
+#    networks:
+#      - streamvibe-network
+
+volumes:
+  redis-data:
+  umami-db-local-data:
+
+networks:
+  streamvibe-network:
+    name: streamvibe-network
+    driver: bridge

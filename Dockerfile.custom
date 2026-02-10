@@ -1,0 +1,5 @@
+FROM ghcr.io/umami-software/umami:postgresql-latest
+
+# Set build-arg để override ALLOWED_FRAME_URLS (space-delimited, không comma)
+ARG ALLOWED_FRAME_URLS="http://localhost:3000 http://localhost:3001"
+ENV ALLOWED_FRAME_URLS=${ALLOWED_FRAME_URLS}

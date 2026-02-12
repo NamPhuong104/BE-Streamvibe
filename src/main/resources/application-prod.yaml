@@ -7,13 +7,15 @@ spring:
   # DATABASE - SUPABASE (Production)
   # ===================================
   datasource:
-    url: ${DB_URL:jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:6543/postgres}
-    username: ${DB_USERNAME:postgres}
-    password: ${DB_PASSWORD:Zb6umRu9f8EwnsnU}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://aws-1-ap-south-1.pooler.supabase.com:6543/postgres}
+    username: ${SPRING_DATASOURCE_USERNAME:postgres.xjyzgieluqxlccfdpyvu}
+    password: ${SPRING_DATASOURCE_PASSWORD:Zb6umRu9f8EwnsnU}
     hikari:
-      maximum-pool-size: ${DB_POOL_SIZE:10}
-      minimum-idle: ${DB_MIN_IDLE:5}
+      maximum-pool-size: 5
+      minimum-idle: 0
       connection-timeout: 30000
+      idle-timeout: 300000
+      max-lifetime: 600000
 
   jpa:
     show-sql: false
@@ -28,56 +30,62 @@ spring:
       continue-on-error: true
 
   # ===================================
-  # REDIS - PRODUCTION
+  # REDIS
   # ===================================
   data:
     redis:
-      host: ${REDIS_HOST:localhost}
-      port: ${REDIS_PORT:6379}
+      host: ${SPRING_DATA_REDIS_HOST:redis}
+      port: ${SPRING_DATA_REDIS_PORT:6379}
       timeout: 5000
-
+      lettuce:
+        pool:
+          max-active: 8
+          max-idle: 4
+          min-idle: 1
+          max-wait: 5000ms
+        shutdown-timeout: 200ms
   cache:
     redis:
-      time-to-live: ${CACHE_TTL:3600000}
+      time-to-live: 3600000
 
   # ===================================
-  # EMAIL - PRODUCTION
+  # EMAIL
   # ===================================
   mail:
-    username: ${MAIL_USERNAME:namphuongtest@gmail.com}
-    password: ${MAIL_PASSWORD:njzd jrec qvau wvkh}
+    username: ${SPRING_MAIL_USERNAME:namphuongtest@gmail.com}
+    password: ${SPRING_MAIL_PASSWORD:njzd jrec qvau wvkh}
 
 # ===================================
-# CLOUDINARY - PRODUCTION
+# CLOUDINARY (account local)
 # ===================================
 cloudinary:
-  cloud-name: ${CLOUDINARY_CLOUD_NAME:ddpbhytdh}
-  api-key: ${CLOUDINARY_API_KEY:142387517415863}
-  api-secret: ${CLOUDINARY_API_SECRET:FPFMohinoScDgNqSHCHa46Fs_c8}
+  cloud-name: ${CLOUDINARY_CLOUD_NAME:drgnfmh54}
+  api-key: ${CLOUDINARY_API_KEY:665447716324619}
+  api-secret: ${CLOUDINARY_API_SECRET:YTM2PB654mY52sNpi94jYv0n0R0}
 
 # ===================================
-# JWT SECRET - PRODUCTION
+# JWT SECRET
 # ===================================
 jwt:
-  base64-secret: ${JWT_SECRET:VG9pVGVuTGFQaHVvbmdEYW5nSG9jU3ByaW5nU2VjdXJpdHlWYVRvaUNhbk1vdENhaUtleVJhdExhRGFpMTIzNDU2Nzg5}
+  base64-secret: ${JWT_BASE64_SECRET:VG9pVGVuTGFQaHVvbmdEYW5nSG9jU3ByaW5nU2VjdXJpdHlWYVRvaUNhbk1vdENhaUtleVJhdExhRGFpMTIzNDU2Nzg5}
 
 # ===================================
-# GOOGLE - PRODUCTION
+# GOOGLE
 # ===================================
 google:
   client-id: ${GOOGLE_CLIENT_ID:959314408688-jvu23ua7f4ljpherafbf0mjm4m3l1spj.apps.googleusercontent.com}
 
 # ===================================
-# APP CONFIG - PRODUCTION
+# APP CONFIG
 # ===================================
 app:
-  frontend-url: ${FRONTEND_URL:http://localhost:3000}
+  frontend-url: ${APP_FRONTEND_URL:https://streamvibe.online}
 
 # ===================================
-# LOGGING - PRODUCTION (Less verbose)
+# LOGGING - PRODUCTION
 # ===================================
 logging:
   level:
-    org.springframework: ERROR
-    com.movieapp: ERROR
+    org.springframework: WARN
+    com.movieapp: INFO
     org.hibernate.SQL: ERROR

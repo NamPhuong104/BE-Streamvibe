@@ -65,6 +65,18 @@ public class CachedSectionService {
         return BLOCKED_TYPE.contains(item.getType().trim().toLowerCase());
     }
 
+    private boolean isPosterNull(OphimMovieItem item) {
+        if (item.getPosterUrl() == null || item.getPosterUrl().isEmpty()) return true;
+
+        return false;
+    }
+
+    private boolean isThumbNull(OphimMovieItem item) {
+        if (item.getThumbUrl() == null || item.getThumbUrl().isEmpty()) return true;
+
+        return false;
+    }
+
     // ==================== PREDICATES ====================
 
     /**
@@ -399,7 +411,7 @@ public class CachedSectionService {
 
         List<CompletableFuture<MovieItemDTO>> futures = candidates.stream()
                 .map(item -> CompletableFuture.supplyAsync(
-                        () -> processItemWithDetailAndPlayableCheck(item),
+                        () -> processItemWithDetailAndPlayableCheck(item, true),
                         executorService
                 ))
                 .collect(Collectors.toList());
@@ -427,7 +439,7 @@ public class CachedSectionService {
      *
      * @return MovieItemDTO nếu playable, NULL nếu không
      */
-    private MovieItemDTO processItemWithDetailAndPlayableCheck(OphimMovieItem item) {
+    private MovieItemDTO processItemWithDetailAndPlayableCheck(OphimMovieItem item, boolean requirePoster) {
         try {
             OphimMovieDetailResponse detailResponse = ophimClient.getMovieDetail(item.getSlug());
 
@@ -459,6 +471,8 @@ public class CachedSectionService {
             String thumbUrl = (detailItem.getThumbUrl() != null && !detailItem.getThumbUrl().isEmpty())
                     ? detailItem.getThumbUrl()
                     : item.getThumbUrl();
+
+            if (requirePoster && (posterUrl == null || posterUrl.isEmpty())) return null;
 
             dto.setPosterUrl(posterUrl);
             dto.setThumbUrl(thumbUrl);

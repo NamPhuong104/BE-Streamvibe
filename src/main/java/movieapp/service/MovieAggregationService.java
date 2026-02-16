@@ -6,15 +6,20 @@ import movieapp.dto.MovieDetail.AggregatedMovieDetailResponse;
 import movieapp.dto.MovieDetail.OphimActorData;
 import movieapp.dto.MovieDetail.UserMovieDataDTO;
 import movieapp.dto.MovieDetail.UserMovieDataProjection;
+import movieapp.dto.OphimResponse.OphimImageResponse;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
 import movieapp.entity.User;
 import movieapp.repository.UserMovieDataRepository;
 import movieapp.util.Util;
 import org.springframework.stereotype.Service;
 
+import java.util.Collection;
+import java.util.Collections;
+import java.util.List;
 import java.util.Optional;
 import java.util.concurrent.CompletableFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.stream.Collectors;
 
 /**
  * Service tổng hợp movie detail từ nhiều nguồn:
@@ -50,8 +55,9 @@ public class MovieAggregationService {
                     CompletableFuture.supplyAsync(() -> fetchActorData(slug));
             CompletableFuture<UserMovieDataDTO> userDataFuture =
                     CompletableFuture.supplyAsync(() -> fetchUserData(slug, user));
+            CompletableFuture<List<String>> imagesFuture = CompletableFuture.supplyAsync(() -> fetchBackdropImages(slug));
 
-            CompletableFuture.allOf(movieFuture, actorFuture, userDataFuture)
+            CompletableFuture.allOf(movieFuture, actorFuture, userDataFuture, imagesFuture)
                     .get(10, TimeUnit.SECONDS);
 
             // Convert movie data
@@ -62,12 +68,14 @@ public class MovieAggregationService {
 
             OphimActorData actorData = actorFuture.get();
             UserMovieDataDTO userData = userDataFuture.get();
+            List<String> backdropImages = imagesFuture.get();
 
             // Pass util để format time
             return AggregatedMovieDetailResponse.build(
                     movieConvert,
                     actorData,
                     userData,
+                    backdropImages,
                     user != null,
                     util  // ✅ Truyền util
             );
@@ -132,4 +140,26 @@ public class MovieAggregationService {
         }
     }
 
+    private List<String> fetchBackdropImages(String slug) {
+        try {
+            OphimImageResponse response = ophimClient.getMovieImages(slug);
+            if (response == null || !response.isSuccess() || response.getData() == null || response.getData().getImages() == null)
+                return Collections.emptyList();
+
+            String baseUrl = "https://image.tmdb.org/t/p/w1280";
+            if (response.getData().getImageSizes() != null && response.getData().getImageSizes().getBackdrop() != null && response.getData().getImageSizes().getBackdrop().getW1280() != null)
+                baseUrl = response.getData().getImageSizes().getBackdrop().getW1280();
+
+            final String finalBaseUrl = baseUrl;
+
+            List<String> backdrops = response.getData().getImages().stream().filter(img -> "backdrop".equals(img.getType())).map(img -> finalBaseUrl + img.getFilePath()).collect(Collectors.toList());
+
+            Collections.shuffle(backdrops);
+
+            return backdrops;
+        } catch (Exception e) {
+            log.warn("⚠️ Fetch backdrop images failed (optional): {}", e.getMessage());
+            return Collections.emptyList();
+        }
+    }
 }

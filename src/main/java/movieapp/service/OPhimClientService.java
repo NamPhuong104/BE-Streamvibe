@@ -6,8 +6,10 @@ import movieapp.config.properties.OPhimProperties;
 import movieapp.dto.MovieDetail.OphimActorApiResponse;
 import movieapp.dto.MovieDetail.OphimActorData;
 import movieapp.dto.OphimResponse.OphimHomepageResponse;
+import movieapp.dto.OphimResponse.OphimImageResponse;
 import movieapp.dto.OphimResponse.OphimListResponse;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
+import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Component;
 import org.springframework.web.client.RestTemplate;
 
@@ -81,6 +83,19 @@ public class OPhimClientService {
         try {
             OphimActorApiResponse response = restTemplate.getForObject(url, OphimActorApiResponse.class);
             return response != null && response.isSuccess() ? response.getData() : null;
+        } catch (Exception e) {
+            log.error("⚠\uFE0F Failed to fetch actors for {}: {}", url, e.getMessage());
+            return null;
+        }
+    }
+
+    public OphimImageResponse getMovieImages(String slug) {
+        String url = oPhimProperties.getBaseUrl() + "/phim/" + slug + "/images";
+
+        try {
+            OphimImageResponse response = restTemplate.getForObject(url, OphimImageResponse.class);
+
+            return response != null && response.isSuccess() ? response : null;
         } catch (Exception e) {
             log.error("⚠\uFE0F Failed to fetch actors for {}: {}", url, e.getMessage());
             return null;

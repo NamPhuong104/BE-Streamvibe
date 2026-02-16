@@ -39,6 +39,8 @@ public class AggregatedMovieDetailResponse {
     private List<PlaylistDTO> playlists;
     private Long playlistCheckedId;
 
+    private List<String> backdropImages;
+
     // ========== META ==========
     private boolean isAuthenticated;
     private long fetchedAt;
@@ -86,13 +88,13 @@ public class AggregatedMovieDetailResponse {
         private Integer movieCount;
         private Boolean hasMovie;  // true nếu movie này đã có trong playlist
     }
-
     // ========== BUILD METHOD ==========
 
     public static AggregatedMovieDetailResponse build(
             OphimMovieDetail movieData,
             OphimActorData actorData,
             UserMovieDataDTO userData,
+            List<String> backdropImages,
             boolean isAuthenticated,
             Util util) {
 
@@ -104,6 +106,7 @@ public class AggregatedMovieDetailResponse {
                 .watchProgress(buildWatchProgress(userData, util))
                 .playlistCheckedId(userData.getCheckedPlaylistId())
                 .playlists(buildPlaylists(userData.getPlaylists()))
+                .backdropImages(backdropImages)
                 .isAuthenticated(isAuthenticated)
                 .fetchedAt(System.currentTimeMillis())
                 .build();

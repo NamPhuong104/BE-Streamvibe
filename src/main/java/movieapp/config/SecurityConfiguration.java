@@ -51,6 +51,8 @@ public class SecurityConfiguration {
                 "/api/v1/movies/**",
                 "/api/v1/admin/blocked-keywords/list-blocked-keywords",
                 "/api/v1/health",
+                "/api/v1/rooms/browse",
+                "/ws/**"
         };
 
         http
@@ -61,6 +63,9 @@ public class SecurityConfiguration {
                         .requestMatchers(publicEndpoints).permitAll()  // Permit all cho API homepage
                         .requestMatchers("/api/v1/admin/**").hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .requestMatchers("/api/v1/premium/**").hasAnyRole("PREMIUM", "MODERATOR", "ADMIN", "SUPER_ADMIN")
+                        .requestMatchers("/api/v1/rooms/browse").permitAll()
+                        .requestMatchers("/ws/**").permitAll()  // Auth handled in WebSocket interceptor
+                        .requestMatchers("/api/v1/rooms/**").authenticated()
                         .anyRequest().authenticated()  // Auth cho các endpoint khác nếu cần
                 )
                 .exceptionHandling(ex -> ex

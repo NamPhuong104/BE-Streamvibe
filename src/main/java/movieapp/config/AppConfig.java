@@ -14,7 +14,6 @@ public class AppConfig {
     private final AppProperties app;
     private final OPhimProperties ophim;
     private final JwtProperties jwt;
-    private final UpAnhNhanhProperties cloudinary;
     private final GoogleProperties google;
     private final CacheProperties cache;
     private final MailProperties mail;

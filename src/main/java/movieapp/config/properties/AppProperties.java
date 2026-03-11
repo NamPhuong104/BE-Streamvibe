@@ -7,12 +7,6 @@ import org.springframework.boot.context.properties.ConfigurationProperties;
 @ConfigurationProperties(prefix = "app")
 public class AppProperties {
     private String frontendUrl = "http://localhost:3000";
-    private ImageConfig image = new ImageConfig();
-
-    @Data
-    public static class ImageConfig {
-        private boolean enableImageOptimization = true;
-    }
 
     /**
      * Kiểm tra có phải môi trường production không

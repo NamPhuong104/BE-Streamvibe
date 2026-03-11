@@ -20,8 +20,6 @@ public class WatchHistoryRes {
 
     private String posterUrl;
     private String thumbUrl;
-    private String optimizedPoster;
-    private String optimizedThumb;
 
     private Long currentTime;
     private Long duration;

@@ -3,7 +3,6 @@ package movieapp.service;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import movieapp.dto.Dashboard.*;
-import movieapp.entity.OptimizedImage;
 import movieapp.repository.*;
 import org.springframework.stereotype.Service;
 
@@ -11,20 +10,16 @@ import java.time.LocalDate;
 import java.time.LocalDateTime;
 import java.time.format.DateTimeFormatter;
 import java.util.*;
-import java.util.stream.Collectors;
 
 @Slf4j
 @Service
 @RequiredArgsConstructor
 public class DashboardService {
-    private static final String IMAGE_TYPE_POSTER = "poster";
-    private static final String IMAGE_TYPE_THUMB = "thumb";
     private final UserRepository userRepository;
     private final WatchHistoryRepository watchHistoryRepository;
     private final FavoriteRepository favoriteRepository;
     private final PlaylistRepository playlistRepository;
     private final PlaylistMovieRepository playlistMovieRepository;
-    private final ImageOptimizationRepository imageOptimizationRepository;
 
     // ==================== USER STATS ====================
     public UserStatsResponse getUserStats() {
@@ -150,10 +145,6 @@ public class DashboardService {
 
         if (results.isEmpty()) return new ArrayList<>();
 
-        List<String> movieSlugs = results.stream().map(TopFavoritedProjection::getMovieSlug).collect(Collectors.toList());
-
-        Map<String, Map<String, OptimizedImage>> imageMap = getOptimizedImagesMap(movieSlugs);
-
         List<TopMovieDTO> movies = new ArrayList<>();
         int rank = 1;
 
@@ -168,7 +159,6 @@ public class DashboardService {
                     .viewCount(row.getFavoriteCount())
                     .totalWatchTime(0L)
                     .build();
-            setOptimizedImages(dto, row.getMovieSlug(), imageMap);
             movies.add(dto);
         }
 
@@ -191,14 +181,6 @@ public class DashboardService {
             return new ArrayList<>();
         }
 
-        // Extract movie slugs để batch query optimized images
-        List<String> movieSlugs = results.stream()
-                .map(TopWatchedProjection::getMovieSlug)
-                .collect(Collectors.toList());
-
-        // Batch query optimized images
-        Map<String, Map<String, OptimizedImage>> imageMap = getOptimizedImagesMap(movieSlugs);
-
         // Build response
         List<TopMovieDTO> movies = new ArrayList<>();
         int rank = 1;
@@ -215,7 +197,6 @@ public class DashboardService {
                     .totalWatchTime(row.getTotalWatchTime())
                     .build();
 
-            setOptimizedImages(dto, row.getMovieSlug(), imageMap);
             movies.add(dto);
         }
 
@@ -275,51 +256,6 @@ public class DashboardService {
             return String.format("%dh %dm", hours, minutes);
         } else {
             return String.format("%dm", minutes);
-        }
-    }
-
-    /**
-     * Batch query optimized images cho list slugs
-     * Return: Map<slug, Map<imageType, OptimizedImage>>
-     */
-    private Map<String, Map<String, OptimizedImage>> getOptimizedImagesMap(List<String> slugs) {
-        if (slugs == null || slugs.isEmpty()) {
-            return Map.of();
-        }
-
-        List<OptimizedImage> images = imageOptimizationRepository.findBySlugIn(slugs);
-
-        return images.stream()
-                .collect(Collectors.groupingBy(
-                        OptimizedImage::getSlug,
-                        Collectors.toMap(
-                                OptimizedImage::getImageType,
-                                img -> img,
-                                (existing, replacement) -> existing  // Giữ cái đầu tiên nếu trùng
-                        )
-                ));
-    }
-
-    /**
-     * Set optimized images cho TopMovieDTO
-     */
-    private void setOptimizedImages(TopMovieDTO dto, String slug,
-                                    Map<String, Map<String, OptimizedImage>> imageMap) {
-        Map<String, OptimizedImage> slugImages = imageMap.get(slug);
-
-        if (slugImages == null) {
-            return;
-        }
-
-        OptimizedImage posterImage = slugImages.get(IMAGE_TYPE_POSTER);
-        OptimizedImage thumbImage = slugImages.get(IMAGE_TYPE_THUMB);
-
-        if (posterImage != null) {
-            dto.setOptimizedPosterUrl(posterImage.getOptimizedUrl());
-        }
-
-        if (thumbImage != null) {
-            dto.setOptimizedThumbUrl(thumbImage.getOptimizedUrl());
         }
     }
 }

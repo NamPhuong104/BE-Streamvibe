@@ -13,9 +13,7 @@ public class FavoriteRes {
     private String movieName;
     private String originName;
     private String posterUrl;
-    private String optimizedPoster;
     private String thumbUrl;
-    private String optimizedThumb;
     private String episodeCurrent;
     private String lang;
     private String quality;

@@ -1,12 +1,28 @@
 package movieapp.util;
 
+import lombok.RequiredArgsConstructor;
+import movieapp.config.properties.OPhimProperties;
 import org.springframework.stereotype.Component;
 
 import java.security.SecureRandom;
 
 @Component
+@RequiredArgsConstructor
 public class Util {
     private static final SecureRandom random = new SecureRandom();
+    private final OPhimProperties oPhimProperties;
+
+    /**
+     * Build full image URL từ relative path ophim
+     * - Nếu null/empty → return null
+     * - Nếu đã là full URL (http...) → return nguyên
+     * - Nếu relative path → prefix với ophim CDN
+     */
+    public String buildFullUrl(String imageUrl) {
+        if (imageUrl == null || imageUrl.isEmpty()) return null;
+        if (imageUrl.startsWith("http")) return imageUrl;
+        return oPhimProperties.getFullUrlImage() + "/" + imageUrl;
+    }
 
     public String normalizeEpisode(String episodeSlug) {
         if (episodeSlug == null || episodeSlug.trim().isEmpty()) return null;

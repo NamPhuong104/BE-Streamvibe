@@ -110,19 +110,7 @@ CREATE TABLE IF NOT EXISTS watch_history (
     CONSTRAINT uk_user_movie_episode UNIQUE (user_id, movie_slug, episode_slug)
 );
 
--- 7. Tạo bảng OPTIMIZED_IMAGES (không phụ thuộc)
-CREATE TABLE IF NOT EXISTS optimized_images (
-    id BIGSERIAL PRIMARY KEY,
-    original_url VARCHAR(500) NOT NULL UNIQUE,
-    cloudinary_url VARCHAR(500) NOT NULL,
-    image_type VARCHAR(50) NOT NULL,
-    cloudinary_public_id VARCHAR(255) NOT NULL,
-    slug VARCHAR(255) NOT NULL,
-    created_at TIMESTAMP,
-    CONSTRAINT uk_slug_image_type UNIQUE (slug, image_type)
-);
-
--- 8. Tạo bảng BLOCKED_KEYWORDS (không phụ thuộc)
+-- 7. Tạo bảng BLOCKED_KEYWORDS (không phụ thuộc)
 CREATE TABLE IF NOT EXISTS blocked_keywords (
     id BIGSERIAL PRIMARY KEY,
     keyword VARCHAR(100) NOT NULL UNIQUE,
@@ -157,9 +145,6 @@ CREATE INDEX IF NOT EXISTS idx_playlist_movie_slug ON playlist_movies(movie_slug
 CREATE INDEX IF NOT EXISTS idx_watch_history_user_watched ON watch_history(user_id, last_watched_at DESC);
 CREATE INDEX IF NOT EXISTS idx_watch_history_user_movie ON watch_history(user_id, movie_slug, last_watched_at DESC);
 CREATE INDEX IF NOT EXISTS idx_watch_history_user_completed ON watch_history(user_id, completed, last_watched_at DESC);
-
--- Optimized images indexes
-CREATE INDEX IF NOT EXISTS idx_optimized_image_slug ON optimized_images(slug);
 
 -- Create function
 CREATE OR REPLACE FUNCTION get_user_movie_data(p_user_id BIGINT, p_movie_slug VARCHAR(255))

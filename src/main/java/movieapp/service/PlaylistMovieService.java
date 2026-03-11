@@ -2,19 +2,18 @@ package movieapp.service;
 
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
+import movieapp.dto.MetaAndHead.ResultPaginationDTO;
 import movieapp.dto.OphimResponse.OphimMovieDetail;
 import movieapp.dto.OphimResponse.OphimMovieDetailResponse;
-import movieapp.entity.OptimizedImage;
+import movieapp.dto.PlaylistMovie.PlaylistMovieCreateDTO;
+import movieapp.dto.PlaylistMovie.PlaylistMovieRes;
 import movieapp.entity.Playlist;
 import movieapp.entity.PlaylistMovie;
 import movieapp.entity.User;
-import movieapp.dto.MetaAndHead.ResultPaginationDTO;
-import movieapp.dto.PlaylistMovie.PlaylistMovieCreateDTO;
-import movieapp.dto.PlaylistMovie.PlaylistMovieRes;
 import movieapp.exception.CommonMessageException;
-import movieapp.repository.ImageOptimizationRepository;
 import movieapp.repository.PlaylistMovieRepository;
 import movieapp.repository.PlaylistRepository;
+import movieapp.util.Util;
 import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.data.jpa.domain.Specification;
@@ -22,7 +21,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -30,24 +28,18 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class PlaylistMovieService {
-    private static final String IMAGE_TYPE_THUMB = "thumb";
-    private static final String IMAGE_TYPE_POSTER = "poster";
     private final PlaylistMovieRepository playlistMovieRepository;
     private final PlaylistRepository playlistRepository;
-    private final ImageOptimizationRepository optimizedImageRepository;
-    private final ImageOptimizationService imageOptimizationService;
     private final OPhimClientService oPhimClientService;
     private final UserService userService;
+    private final Util util;
 
     public ResultPaginationDTO handleGetMovieInMyPlaylist(Long playlistId, Pageable pageable) {
         User currentUser = userService.getCurrentUser();
 
         Page<PlaylistMovie> pagePm = playlistMovieRepository.findLastedByPlaylistIdAndUserId(currentUser.getId(), playlistId, pageable);
 
-        List<String> slugs = pagePm.getContent().stream().map(PlaylistMovie::getMovieSlug).distinct().collect(Collectors.toList());
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
-
-        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(playlistMovie -> convertToPlaylistMovieRes(playlistMovie, imageMap)).collect(Collectors.toList());
+        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(playlistMovie -> convertToPlaylistMovieRes(playlistMovie)).collect(Collectors.toList());
 
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
@@ -69,10 +61,7 @@ public class PlaylistMovieService {
 
         Page<PlaylistMovie> pagePm = playlistMovieRepository.findLastedByUser(currentUser.getId(), pageable);
 
-        List<String> slugs = pagePm.getContent().stream().map(PlaylistMovie::getMovieSlug).distinct().collect(Collectors.toList());
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
-
-        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(playlistMovie -> convertToPlaylistMovieRes(playlistMovie, imageMap)).collect(Collectors.toList());
+        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(playlistMovie -> convertToPlaylistMovieRes(playlistMovie)).collect(Collectors.toList());
 
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
@@ -92,10 +81,7 @@ public class PlaylistMovieService {
     public ResultPaginationDTO handleGetAllPlaylistMovie(Specification spec, Pageable pageable) {
         Page<PlaylistMovie> pagePm = playlistMovieRepository.findAll(spec, pageable);
 
-        List<String> slugs = pagePm.getContent().stream().map(PlaylistMovie::getMovieSlug).distinct().collect(Collectors.toList());
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
-
-        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(playlistMovie -> convertToPlaylistMovieRes(playlistMovie, imageMap)).collect(Collectors.toList());
+        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(playlistMovie -> convertToPlaylistMovieRes(playlistMovie)).collect(Collectors.toList());
 
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
@@ -118,10 +104,7 @@ public class PlaylistMovieService {
 
         Page<PlaylistMovie> pagePm = playlistMovieRepository.findByPlaylistIdOrderByAddedAtDesc(playlistId, pageable);
 
-        List<String> slugs = pagePm.getContent().stream().map(PlaylistMovie::getMovieSlug).distinct().collect(Collectors.toList());
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
-
-        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(pm -> convertToPlaylistMovieRes(pm, imageMap)).collect(Collectors.toList());
+        List<PlaylistMovieRes> dtoList = pagePm.getContent().stream().map(pm -> convertToPlaylistMovieRes(pm)).collect(Collectors.toList());
 
         ResultPaginationDTO rs = new ResultPaginationDTO();
         ResultPaginationDTO.Meta mt = new ResultPaginationDTO.Meta();
@@ -175,9 +158,7 @@ public class PlaylistMovieService {
         newPlaylist.setMovieCount(newPlaylist.getMovieCount() + 1);
         playlistRepository.save(newPlaylist);
 
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(List.of(data.getMovieSlug()));
-
-        return convertToPlaylistMovieRes(pm, imageMap);
+        return convertToPlaylistMovieRes(pm);
     }
 
     public Long handleCheckMovieInMyPlaylist(String movieSlug) {
@@ -234,9 +215,7 @@ public class PlaylistMovieService {
         newPlaylist.setMovieCount(newPlaylist.getMovieCount() + 1);
         playlistRepository.save(newPlaylist);
 
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(List.of(data.getMovieSlug()));
-
-        return convertToPlaylistMovieRes(pm, imageMap);
+        return convertToPlaylistMovieRes(pm);
     }
 
     public void handleDeletePlaylistMovie(Long id) {
@@ -246,32 +225,17 @@ public class PlaylistMovieService {
     }
 
 
-    //    HELPER METHODS
-    private Map<String, Map<String, OptimizedImage>> buildImageMap(List<String> slugs) {
-        if (slugs.isEmpty()) return Map.of();
-
-        List<OptimizedImage> images = optimizedImageRepository.findBySlugIn(slugs);
-
-        return images.stream().collect(Collectors.groupingBy(OptimizedImage::getSlug, Collectors.toMap(OptimizedImage::getImageType, img -> img, (existing, replacement) -> existing)));
-    }
-
     private PlaylistMovie buildPlaylistMovie(Playlist playlist, PlaylistMovieCreateDTO dto) {
-        String poster = imageOptimizationService.buildFullUrl(dto.getPosterUrl());
-        String thumb = imageOptimizationService.buildFullUrl(dto.getThumbUrl());
+        String poster = util.buildFullUrl(dto.getPosterUrl());
+        String thumb = util.buildFullUrl(dto.getThumbUrl());
 
-        if (dto.getPosterUrl() == null || dto.getThumbUrl() == null) {
+        if (poster == null || thumb == null) {
             try {
                 OphimMovieDetailResponse detailResponse = oPhimClientService.getMovieDetail(dto.getMovieSlug());
 
                 OphimMovieDetail movie = detailResponse.getData().getItem();
-                poster = imageOptimizationService.buildFullUrl(movie.getPosterUrl());
-                thumb = imageOptimizationService.buildFullUrl(movie.getThumbUrl());
-
-                if (poster != null) {
-                    dto.setPosterUrl(poster);
-                } else if (thumb != null) {
-                    dto.setThumbUrl(thumb);
-                }
+                if (poster == null) poster = util.buildFullUrl(movie.getPosterUrl());
+                if (thumb == null) thumb = util.buildFullUrl(movie.getThumbUrl());
             } catch (Exception e) {
                 log.warn("Không lấy được poster mới từ Ophim cho slug {}: {}", dto.getMovieSlug(), e.getMessage());
             }
@@ -293,7 +257,7 @@ public class PlaylistMovieService {
     }
 
     private PlaylistMovieRes convertToPlaylistMovieRes(PlaylistMovie
-                                                               pm, Map<String, Map<String, OptimizedImage>> imageMap) {
+                                                               pm) {
         PlaylistMovieRes res = PlaylistMovieRes.builder()
                 .id(pm.getId())
                 .movieSlug(pm.getMovieSlug())
@@ -307,17 +271,6 @@ public class PlaylistMovieService {
                 .posterUrl(pm.getPosterUrl())
                 .lang(pm.getLang())
                 .build();
-
-        Map<String, OptimizedImage> slugImages = imageMap.get(pm.getMovieSlug());
-
-        if (slugImages != null) {
-            OptimizedImage thumbImage = slugImages.get(IMAGE_TYPE_THUMB);
-            OptimizedImage posterImage = slugImages.get(IMAGE_TYPE_POSTER);
-
-            if (thumbImage != null) res.setOptimizedThumb(thumbImage.getOptimizedUrl());
-            if (posterImage != null) res.setOptimizedPoster(posterImage.getOptimizedUrl());
-        }
-
         if (pm.getPlaylist() != null) {
             res.setPlaylist(new PlaylistMovieRes.PlaylistInfo(pm.getPlaylist().getId(), pm.getPlaylist().getName()));
         }

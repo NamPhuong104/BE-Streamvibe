@@ -12,7 +12,5 @@ import movieapp.dto.OphimResponse.OphimMovieItem;
 @EqualsAndHashCode(callSuper = true)
 public class MovieItemDTO extends OphimMovieItem {
     private String content;
-    private String optimizedThumb;
-    private String optimizedPoster;
     private Boolean isFavorite;
 }

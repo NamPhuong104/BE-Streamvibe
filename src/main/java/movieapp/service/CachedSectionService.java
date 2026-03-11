@@ -32,14 +32,11 @@ public class CachedSectionService {
     private static final int MAX_PAGES = 5;
 
     private final OPhimClientService ophimClient;
-    private final ImageOptimizationService imageService;
     private final ExecutorService executorService;
 
     public CachedSectionService(OPhimClientService ophimClient,
-                                ImageOptimizationService imageService,
                                 @Qualifier("taskExecutor") ExecutorService executorService) {
         this.ophimClient = ophimClient;
-        this.imageService = imageService;
         this.executorService = executorService;
     }
 
@@ -476,8 +473,6 @@ public class CachedSectionService {
 
             dto.setPosterUrl(posterUrl);
             dto.setThumbUrl(thumbUrl);
-            dto.setOptimizedThumb(imageService.optimizeThumb(thumbUrl, item.getSlug()));
-            dto.setOptimizedPoster(imageService.optimizedPoster(posterUrl, item.getSlug()));
 
             return dto;
 
@@ -493,9 +488,6 @@ public class CachedSectionService {
     private MovieItemDTO processItemWithoutDetail(OphimMovieItem item) {
         MovieItemDTO dto = new MovieItemDTO();
         BeanUtils.copyProperties(item, dto);
-
-        dto.setOptimizedThumb(imageService.optimizeThumb(item.getThumbUrl(), item.getSlug()));
-        dto.setOptimizedPoster(imageService.optimizedPoster(item.getPosterUrl(), item.getSlug()));
         dto.setContent(null);
 
         return dto;

@@ -112,20 +112,6 @@
             <groupId>org.springframework.boot</groupId>
             <artifactId>spring-boot-starter-websocket</artifactId>
         </dependency>
-
-        <!-- WebP support -->
-        <dependency>
-            <groupId>org.sejda.imageio</groupId>
-            <artifactId>webp-imageio</artifactId>
-            <version>0.1.6</version>
-        </dependency>
-
-        <!-- Better JPEG/PNG reading (xử lý edge cases) -->
-        <dependency>
-            <groupId>com.twelvemonkeys.imageio</groupId>
-            <artifactId>imageio-jpeg</artifactId>
-            <version>3.10.1</version>
-        </dependency>
     </dependencies>
 
     <build>

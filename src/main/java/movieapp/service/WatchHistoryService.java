@@ -9,11 +9,9 @@ import movieapp.dto.WatchHistory.WatchHistoryCreateReq;
 import movieapp.dto.WatchHistory.WatchHistoryRes;
 import movieapp.dto.WatchHistory.WatchHistorySummaryRes;
 import movieapp.dto.WatchHistory.WatchHistoryUpdateReq;
-import movieapp.entity.OptimizedImage;
 import movieapp.entity.User;
 import movieapp.entity.WatchHistory;
 import movieapp.exception.CommonMessageException;
-import movieapp.repository.ImageOptimizationRepository;
 import movieapp.repository.UserRepository;
 import movieapp.repository.WatchHistoryRepository;
 import movieapp.util.SecurityUtil;
@@ -25,7 +23,6 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.util.List;
-import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
@@ -33,13 +30,9 @@ import java.util.stream.Collectors;
 @Service
 @RequiredArgsConstructor
 public class WatchHistoryService {
-    private static final double COMPLETE_THRESHOLD = 95;
-    private static final String IMAGE_TYPE_THUMB = "thumb";
-    private static final String IMAGE_TYPE_POSTER = "poster";
+    private static final double COMPLETE_THRESHOLD = 90;
 
     private final WatchHistoryRepository watchHistoryRepository;
-    private final ImageOptimizationRepository optimizedImageRepository;
-    private final ImageOptimizationService imageOptimizationService;
     private final OPhimClientService oPhimClientService;
     private final UserRepository userRepository;
     private final Util util;
@@ -47,18 +40,9 @@ public class WatchHistoryService {
     public ResultPaginationDTO handleGetAllWatchHistory(Specification<WatchHistory> spec, Pageable pageable) {
         Page<WatchHistory> pageHistory = watchHistoryRepository.findAll(spec, pageable);
 
-        // ⭐ BATCH QUERY: Lấy tất cả slugs từ kết quả
-        List<String> slugs = pageHistory.getContent().stream()
-                .map(WatchHistory::getMovieSlug)
-                .distinct()
-                .collect(Collectors.toList());
-
-        // ⭐ 1 QUERY duy nhất lấy tất cả ảnh
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
-
         // Convert với ảnh đã có sẵn
         List<WatchHistoryRes> dtoList = pageHistory.getContent().stream()
-                .map(history -> convertToRes(history, imageMap))
+                .map(history -> convertToRes(history))
                 .collect(Collectors.toList());
 
         ResultPaginationDTO rs = new ResultPaginationDTO();
@@ -84,11 +68,9 @@ public class WatchHistoryService {
 
         long total = watchHistoryRepository.countUniqueUserMoviePairs();
 
-        List<String> slugs = historyList.stream().map(WatchHistory::getMovieSlug).distinct().toList();
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
 
         List<WatchHistorySummaryRes> dtoList = historyList.stream().map(history -> {
-                    WatchHistorySummaryRes res = convertToSummaryRes(history, imageMap);
+                    WatchHistorySummaryRes res = convertToSummaryRes(history);
                     int episodeCount = watchHistoryRepository.countEpisodesByUserAndMovie(history.getUser().getId(), history.getMovieSlug());
                     res.setEpisodeCount(episodeCount);
 
@@ -124,11 +106,8 @@ public class WatchHistoryService {
 //        Count total movie unique
         long total = watchHistoryRepository.countDistinctMoviesByUserId(currentUser.getId());
 
-        List<String> slugs = historyList.stream().map(WatchHistory::getMovieSlug).distinct().toList();
 
-        Map<String, Map<String, OptimizedImage>> imageMap = buildImageMap(slugs);
-
-        List<WatchHistoryRes> dtoList = historyList.stream().map(history -> convertToRes(history, imageMap))
+        List<WatchHistoryRes> dtoList = historyList.stream().map(history -> convertToRes(history))
                 .collect(Collectors.toList());
 
         ResultPaginationDTO rs = new ResultPaginationDTO();
@@ -164,7 +143,7 @@ public class WatchHistoryService {
 
         if (historyOpt.isEmpty()) return null;
 
-        return convertToRes(historyOpt.get(), Map.of());
+        return convertToRes(historyOpt.get());
     }
 
     @Transactional
@@ -175,28 +154,6 @@ public class WatchHistoryService {
         watchHistoryRepository.deleteHistoryByUserIdAndMovieSlug(currentUser.getId(), slug);
     }
 
-    /**
-     * Build map: slug -> {imageType -> OptimizedImage}
-     * Ví dụ: {"tiger-crane" -> {"thumb" -> OptimizedImage, "poster" -> OptimizedImage}}
-     */
-
-    private Map<String, Map<String, OptimizedImage>> buildImageMap(List<String> slugs) {
-        if (slugs.isEmpty()) {
-            return Map.of();
-        }
-
-        List<OptimizedImage> images = optimizedImageRepository.findBySlugIn(slugs);
-
-        return images.stream()
-                .collect(Collectors.groupingBy(
-                        OptimizedImage::getSlug,
-                        Collectors.toMap(
-                                OptimizedImage::getImageType,
-                                img -> img,
-                                (existing, replacement) -> existing  // Giữ cái đầu tiên nếu duplicate
-                        )
-                ));
-    }
 
     public WatchHistoryRes handleCreateWatchHistory(WatchHistoryCreateReq dto) {
         User user = userRepository.findById(dto.getUserId())
@@ -225,22 +182,18 @@ public class WatchHistoryService {
         history.setProgressPercent(util.roundToOneDecimal(progressPercent));
         history.setCompleted(completed);
         history.setOriginName(dto.getOriginName());
-        String poster = imageOptimizationService.buildFullUrl(dto.getPosterUrl());
-        String thumb = imageOptimizationService.buildFullUrl(dto.getThumbUrl());
 
-        if (dto.getPosterUrl() == null || dto.getThumbUrl() == null) {
+        String poster = util.buildFullUrl(dto.getPosterUrl());
+        String thumb = util.buildFullUrl(dto.getThumbUrl());
+
+        // Nếu thiếu poster hoặc thumb → fetch từ ophim
+        if (poster == null || thumb == null) {
             try {
                 OphimMovieDetailResponse detailResponse = oPhimClientService.getMovieDetail(dto.getMovieSlug());
 
                 OphimMovieDetail movie = detailResponse.getData().getItem();
-                poster = imageOptimizationService.buildFullUrl(movie.getPosterUrl());
-                thumb = imageOptimizationService.buildFullUrl(movie.getThumbUrl());
-
-                if (poster != null) {
-                    history.setPosterUrl(poster);
-                } else if (thumb != null) {
-                    history.setThumbUrl(thumb);
-                }
+                if (poster == null) poster = util.buildFullUrl(movie.getPosterUrl());
+                if (thumb == null) thumb = util.buildFullUrl(movie.getThumbUrl());
             } catch (Exception e) {
                 log.warn("Không lấy được poster mới từ Ophim cho slug {}: {}", history.getMovieSlug(), e.getMessage());
             }
@@ -252,11 +205,7 @@ public class WatchHistoryService {
         history.setThumbUrl(thumbUrl);
         watchHistoryRepository.save(history);
 
-        // Lấy ảnh cho single record
-        Map<String, Map<String, OptimizedImage>> imageMap =
-                buildImageMap(List.of(history.getMovieSlug()));
-
-        return convertToRes(history, imageMap);
+        return convertToRes(history);
     }
 
     public WatchHistoryRes handleUpdateWatchHistory(WatchHistoryUpdateReq dto) {
@@ -290,10 +239,7 @@ public class WatchHistoryService {
 
         watchHistoryRepository.save(history);
 
-        Map<String, Map<String, OptimizedImage>> imageMap =
-                buildImageMap(List.of(history.getMovieSlug()));
-
-        return convertToRes(history, imageMap);
+        return convertToRes(history);
     }
 
     public void handleDeleteWatchHistory(Long id) {
@@ -312,8 +258,7 @@ public class WatchHistoryService {
     /**
      * Convert WatchHistory -> WatchHistoryRes với ảnh từ imageMap
      */
-    private WatchHistoryRes convertToRes(WatchHistory history,
-                                         Map<String, Map<String, OptimizedImage>> imageMap) {
+    private WatchHistoryRes convertToRes(WatchHistory history) {
         WatchHistoryRes res = new WatchHistoryRes();
 
         res.setId(history.getId());
@@ -340,9 +285,6 @@ public class WatchHistoryService {
         res.setCreatedAt(history.getCreatedAt());
         res.setUpdatedAt(history.getUpdatedAt());
 
-        // ⭐ Set ảnh từ imageMap (đã query batch sẵn)
-        setImagesFromMap(res, history.getMovieSlug(), imageMap);
-
         if (history.getUser() != null) {
             res.setUser(new WatchHistoryRes.ResUserDTO(
                     history.getUser().getId(),
@@ -354,8 +296,7 @@ public class WatchHistoryService {
         return res;
     }
 
-    private WatchHistorySummaryRes convertToSummaryRes(WatchHistory history,
-                                                       Map<String, Map<String, OptimizedImage>> imageMap) {
+    private WatchHistorySummaryRes convertToSummaryRes(WatchHistory history) {
         WatchHistorySummaryRes res = new WatchHistorySummaryRes();
 
         res.setId(history.getId());
@@ -382,9 +323,6 @@ public class WatchHistoryService {
         res.setCreatedAt(history.getCreatedAt());
         res.setUpdatedAt(history.getUpdatedAt());
 
-        // Set ảnh từ imageMap
-        setImagesFromMap(res, history.getMovieSlug(), imageMap);
-
         if (history.getUser() != null) {
             res.setUser(new WatchHistoryRes.ResUserDTO(
                     history.getUser().getId(),
@@ -394,31 +332,5 @@ public class WatchHistoryService {
         }
 
         return res;
-    }
-
-    /**
-     * Set ảnh cho response từ imageMap
-     */
-    private void setImagesFromMap(WatchHistoryRes res, String slug,
-                                  Map<String, Map<String, OptimizedImage>> imageMap) {
-        Map<String, OptimizedImage> slugImages = imageMap.get(slug);
-
-        if (slugImages == null) {
-            // Không có ảnh optimize -> để null
-            return;
-        }
-
-        OptimizedImage thumbImage = slugImages.get(IMAGE_TYPE_THUMB);
-        OptimizedImage posterImage = slugImages.get(IMAGE_TYPE_POSTER);
-
-        if (thumbImage != null) {
-            res.setThumbUrl(thumbImage.getOriginalUrl());
-            res.setOptimizedThumb(thumbImage.getOptimizedUrl());
-        }
-
-        if (posterImage != null) {
-            res.setPosterUrl(posterImage.getOriginalUrl());
-            res.setOptimizedPoster(posterImage.getOptimizedUrl());
-        }
     }
 }

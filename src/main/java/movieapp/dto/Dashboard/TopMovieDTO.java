@@ -15,9 +15,7 @@ public class TopMovieDTO {
     private String movieName;
     private String originName;
     private String posterUrl;
-    private String optimizedPosterUrl;
     private String thumbUrl;
-    private String optimizedThumbUrl;
     private Long viewCount;
     private Long totalWatchTime;
 }

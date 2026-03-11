@@ -22,9 +22,6 @@ public class PlaylistMovieRes {
     private LocalDateTime addedAt;
     private LocalDateTime createdAt;
 
-    private String optimizedPoster;
-    private String optimizedThumb;
-
     private PlaylistInfo playlist;
 
     @Getter

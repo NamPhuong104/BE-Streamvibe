@@ -14,19 +14,12 @@ public class AppConfig {
     private final AppProperties app;
     private final OPhimProperties ophim;
     private final JwtProperties jwt;
-    private final CloudinaryProperties cloudinary;
+    private final UpAnhNhanhProperties cloudinary;
     private final GoogleProperties google;
     private final CacheProperties cache;
     private final MailProperties mail;
 
     // ==================== CONVENIENCE METHODS ====================
-
-    /**
-     * Kiểm tra có enable Cloudinary không
-     */
-    public boolean isCloudinaryEnabled() {
-        return app.getImage().isEnableCloudinary() && cloudinary.isValid();
-    }
 
     /**
      * Lấy full image URL từ Ophim

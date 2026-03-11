@@ -315,11 +315,11 @@ public class DashboardService {
         OptimizedImage thumbImage = slugImages.get(IMAGE_TYPE_THUMB);
 
         if (posterImage != null) {
-            dto.setOptimizedPosterUrl(posterImage.getCloudinaryUrl());
+            dto.setOptimizedPosterUrl(posterImage.getOptimizedUrl());
         }
 
         if (thumbImage != null) {
-            dto.setOptimizedThumbUrl(thumbImage.getCloudinaryUrl());
+            dto.setOptimizedThumbUrl(thumbImage.getOptimizedUrl());
         }
     }
 }

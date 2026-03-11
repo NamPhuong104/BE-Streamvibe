@@ -11,7 +11,7 @@ public class AppProperties {
 
     @Data
     public static class ImageConfig {
-        private boolean enableCloudinary = true;
+        private boolean enableImageOptimization = true;
     }
 
     /**

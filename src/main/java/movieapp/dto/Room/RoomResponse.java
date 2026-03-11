@@ -14,6 +14,8 @@ public class RoomResponse {
     private RoomHostDTO host;
     private RoomMovieDTO movie;
     private String state;
+    private double currentTime;
+    private double speed;
     private int memberCount;
     private int maxMembers;
     private boolean requireApproval;

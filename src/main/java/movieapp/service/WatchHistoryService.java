@@ -413,12 +413,12 @@ public class WatchHistoryService {
 
         if (thumbImage != null) {
             res.setThumbUrl(thumbImage.getOriginalUrl());
-            res.setOptimizedThumb(thumbImage.getCloudinaryUrl());
+            res.setOptimizedThumb(thumbImage.getOptimizedUrl());
         }
 
         if (posterImage != null) {
             res.setPosterUrl(posterImage.getOriginalUrl());
-            res.setOptimizedPoster(posterImage.getCloudinaryUrl());
+            res.setOptimizedPoster(posterImage.getOptimizedUrl());
         }
     }
 }

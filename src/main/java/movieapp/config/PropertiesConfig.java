@@ -9,7 +9,7 @@ import org.springframework.context.annotation.Configuration;
         AppProperties.class,
         OPhimProperties.class,
         JwtProperties.class,
-        CloudinaryProperties.class,
+        UpAnhNhanhProperties.class,
         GoogleProperties.class,
         CacheProperties.class,
         MailProperties.class

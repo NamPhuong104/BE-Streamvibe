@@ -3,6 +3,7 @@ package movieapp.config;
 import lombok.RequiredArgsConstructor;
 import lombok.extern.slf4j.Slf4j;
 import movieapp.service.RoomService;
+import movieapp.service.WsUserCacheService;
 import org.springframework.context.event.EventListener;
 import org.springframework.messaging.simp.stomp.StompHeaderAccessor;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -16,6 +17,7 @@ import org.springframework.web.socket.messaging.SessionDisconnectEvent;
 @Slf4j
 public class WebSocketEventListener {
     private final RoomService roomService;
+    private final WsUserCacheService wsUserCacheService;
 
     @EventListener
     public void handleWebSocketConnect(SessionConnectedEvent event) {
@@ -42,6 +44,7 @@ public class WebSocketEventListener {
             log.info("WebSocket disconnected: email={}, session={}", email, sessionId);
 
             roomService.handleUserDisconnect(email);
+            wsUserCacheService.evict(email);
         }
     }
 }

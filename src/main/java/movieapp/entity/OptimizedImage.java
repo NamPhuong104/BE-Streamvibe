@@ -6,6 +6,7 @@ import lombok.Builder;
 import lombok.Data;
 import lombok.NoArgsConstructor;
 
+import java.time.Instant;
 import java.time.LocalDateTime;
 
 @Entity
@@ -31,25 +32,32 @@ public class OptimizedImage {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private long id;
 
-    @Column(nullable = false, unique = true)
+    @Column(name = "original_url", nullable = false, unique = true, columnDefinition = "TEXT")
     private String originalUrl;
 
-    @Column(nullable = false)
-    private String cloudinaryUrl;
+    @Column(name = "optimized_url", nullable = false, columnDefinition = "TEXT")
+    private String optimizedUrl;
 
     @Column(name = "image_type", nullable = false)
     private String imageType;
 
     @Column(nullable = false)
-    private String cloudinaryPublicId;
-
-    @Column(nullable = false)
     private String slug;
 
-    private LocalDateTime createdAt;
+    @Column(name = "created_at")
+    private Instant createdAt;
+
+    @Column(name = "updated_at")
+    private Instant updatedAt;
 
     @PrePersist
     protected void onCreate() {
-        createdAt = LocalDateTime.now();
+        createdAt = Instant.now();
+        updatedAt = Instant.now();
+    }
+
+    @PreUpdate
+    protected void onUpdate() {
+        updatedAt = Instant.now();
     }
 }

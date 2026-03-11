@@ -21,11 +21,12 @@ import java.util.stream.Collectors;
 @Slf4j
 public class RoomService {
     private static final int DEFAULT_MAX_MEMBERS = 999;
-    private static final long HOST_GRACE_PERIOD_SECONDS = 300; // 5 minutes
+    private static final long HOST_GRACE_PERIOD_SECONDS = 180; // 5 minutes
     private final RoomRedisService roomRedis;
     private final UserRepository userRepository;
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
+    private final WsUserCacheService wsUserCache;
     // Track host disconnect time for grace period
     private final Map<String, Instant> hostDisconnectTimes = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -40,7 +41,7 @@ public class RoomService {
 
         String code = roomRedis.generateUniqueCode();
 
-        String roomName = dto.getRoomName() != null && !dto.getRoomName().isBlank() ? dto.getRoomName() : "Phòng của " + currentUser.getUsername();
+        String roomName = dto.getRoomName() != null && !dto.getRoomName().isBlank() ? dto.getRoomName() : currentUser.getUsername();
 
         // Create room data
         Map<String, String> roomData = new HashMap<>();
@@ -167,8 +168,8 @@ public class RoomService {
 
     // ==================== VIDEO SYNC ====================
     public void syncState(String code, RoomStateDTO state, Principal principal) {
-        User currentUser = getUserFromWsPrincipal(principal);
-        validateHost(code, currentUser);
+        Long userId = wsUserCache.getUserIdFromPrincipal(principal);
+        validateHostById(code, userId);
 
         Map<String, String> updates = new HashMap<>();
         updates.put("currentTime", String.valueOf(state.getCurrentTime()));
@@ -211,17 +212,22 @@ public class RoomService {
 
         roomRedis.updateRoomFields(code, updates);
 
-        roomRedis.clearSuggestions(code);
+        roomRedis.removeSuggestionBySlug(code, movie.getSlug());
 
         messagingTemplate.convertAndSend("/topic/room/" + code + "/movie", movie);
     }
 
     public void suggestMovie(String code, MovieSuggestDTO suggestion, Principal principal) {
-        User currentuser = getUserFromWsPrincipal(principal);
+        User currentuser = wsUserCache.getFullUser(principal);
         validateRoomExists(code);
 
         if (!roomRedis.isMember(code, currentuser.getId()))
             throw new CommonMessageException("Bạn không ở trong phòng này");
+
+        String currentMovieSlug = roomRedis.getRoomField(code, "movieSlug");
+        if (suggestion.getMovieSlug().equals(currentMovieSlug)) return;
+
+        if (roomRedis.suggestionExists(code, suggestion.getMovieSlug())) return;
 
         suggestion.setSuggestedByUserId(currentuser.getId());
         suggestion.setSuggestedByUsername(currentuser.getUsername());
@@ -303,9 +309,31 @@ public class RoomService {
             // Host disconnected → start grace period
             hostDisconnectTimes.put(roomCode, Instant.now());
 
-            log.info("Host {} disconnected from room {}. Grace period started.", user.getUsername(), roomCode);
+            // AUTO-PAUSE: Đọc currentTime từ Redis và broadcast PAUSE
+            String currentTimerStr = roomRedis.getRoomField(roomCode, "currentTime");
+            double currentTime = parseDoubleSafe(currentTimerStr, 0);
 
-            messagingTemplate.convertAndSend("/topic/room/" + roomCode + "/host-status", Map.of("status", "disconnected", "graceSeconds", HOST_GRACE_PERIOD_SECONDS));
+            String speedStr = roomRedis.getRoomField(roomCode, "speed");
+            double speed = parseDoubleSafe(speedStr, 1);
+
+            // Update room state to WAITING (paused)
+            roomRedis.updateRoomField(roomCode, "state", "WAITING");
+
+            // Broadcast PAUSE to all members
+            RoomStateDTO pauseState = RoomStateDTO.builder()
+                    .action("PAUSE")
+                    .currentTime(currentTime)
+                    .videoUrl(null)
+                    .episodeSlug(null)
+                    .serverIndex(0)
+                    .speed(speed)
+                    .timestamp(System.currentTimeMillis())
+                    .build();
+            messagingTemplate.convertAndSend("/topic/room/" + roomCode + "/state", pauseState);
+
+            // Broadcast host status
+            log.info("Host {} disconnected from room {}. Grace period started.", user.getUsername(), roomCode, currentTime);
+            messagingTemplate.convertAndSend("/topic/room/" + roomCode + "/host-status", Map.of("status", "disconnected", "graceSeconds", HOST_GRACE_PERIOD_SECONDS, "currentTime", currentTime));
 
         }
     }
@@ -344,6 +372,12 @@ public class RoomService {
     }
 
     // ==================== PRIVATE HELPERS ====================
+    private void validateHostById(String code, Long userId) {
+        String hostId = roomRedis.getRoomField(code, "hostId");
+        if (!userId.toString().equals(hostId))
+            throw new CommonMessageException("Chỉ host mới có quyền thực hiện");
+    }
+
     private User getUserFromWsPrincipal(Principal principal) {
         if (principal instanceof JwtAuthenticationToken auth) {
             String email = auth.getToken().getSubject();
@@ -423,6 +457,8 @@ public class RoomService {
                         .build())
                 .movie(movie)
                 .state(getStr(data, "state"))
+                .currentTime(parseDoubleSafe(getStr(data, "currentTime"), 0))
+                .speed(parseDoubleSafe(getStr(data, "speed"), 1))
                 .memberCount((int) roomRedis.getMemberCount(code))
                 .maxMembers(Integer.parseInt(getStr(data, "maxMembers", "10")))
                 .requireApproval(Boolean.parseBoolean(getStr(data, "requireApproval", "true")))
@@ -430,6 +466,16 @@ public class RoomService {
                 .pendingCount((int) roomRedis.getPendingCount(code))
                 .createdAt(Instant.parse(getStr(data, "createdAt", Instant.now().toString())))
                 .build();
+    }
+
+    private double parseDoubleSafe(String value, double defaultValue) {
+        if (value == null || value.isBlank()) return defaultValue;
+
+        try {
+            return Double.parseDouble(value);
+        } catch (NumberFormatException e) {
+            return defaultValue;
+        }
     }
 
     private void validateRoomExists(String code) {

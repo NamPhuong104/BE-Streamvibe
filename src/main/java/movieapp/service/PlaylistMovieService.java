@@ -314,8 +314,8 @@ public class PlaylistMovieService {
             OptimizedImage thumbImage = slugImages.get(IMAGE_TYPE_THUMB);
             OptimizedImage posterImage = slugImages.get(IMAGE_TYPE_POSTER);
 
-            if (thumbImage != null) res.setOptimizedThumb(thumbImage.getCloudinaryUrl());
-            if (posterImage != null) res.setOptimizedPoster(posterImage.getCloudinaryUrl());
+            if (thumbImage != null) res.setOptimizedThumb(thumbImage.getOptimizedUrl());
+            if (posterImage != null) res.setOptimizedPoster(posterImage.getOptimizedUrl());
         }
 
         if (pm.getPlaylist() != null) {

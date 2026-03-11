@@ -86,9 +86,13 @@ jwt:
 # ===================================
 # APP CONFIGURATION
 # ===================================
+upanhnhanh:
+  api-key: ${UPANHNHANH_API_KEY:upanh_6Ki3HHjZgpD5kfhetGp3l811Yhev3xeplzx6LhQWEF0BL4JV}
+  base-url: https://www.upanhnhanh.com/api/v1
+
 app:
   image:
-    enable-cloudinary: true
+    enable-image-optimization: true
 
   # ===================================
   # CACHE CONFIGURATION

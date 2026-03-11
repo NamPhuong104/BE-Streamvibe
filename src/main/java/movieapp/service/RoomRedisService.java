@@ -185,6 +185,23 @@ public class RoomRedisService {
     }
 
     // ==================== MOVIE SUGGESTIONS ====================
+    public boolean suggestionExists(String code, String movieSlug) {
+        String key = String.format(ROOM_SUGGESTS_KEY, code);
+        List<String> raw = redisTemplate.opsForList().range(key, 0, -1);
+        if (raw == null) return false;
+
+        return raw.stream().anyMatch(json -> {
+                    try {
+                        MovieSuggestDTO dto = objectMapper.readValue(json, MovieSuggestDTO.class);
+                        return movieSlug.equals(dto.getMovieSlug());
+                    } catch (Exception e) {
+                        return false;
+                    }
+                }
+        );
+    }
+
+
     public void addSuggestion(String code, MovieSuggestDTO suggestion) {
         try {
             String key = String.format(ROOM_SUGGESTS_KEY, code);
@@ -216,6 +233,23 @@ public class RoomRedisService {
         Long count = redisTemplate.opsForList().size(key);
 
         return count != null ? count : 0;
+    }
+
+    public void removeSuggestionBySlug(String code, String movieSlug) {
+        String key = String.format(ROOM_SUGGESTS_KEY, code);
+        List<String> raw = redisTemplate.opsForList().range(key, 0, -1);
+        if (raw == null) return;
+
+        for (String json : raw) {
+            try {
+                MovieSuggestDTO dto = objectMapper.readValue(json, MovieSuggestDTO.class);
+                if (movieSlug.equals(dto.getMovieSlug())) {
+                    redisTemplate.opsForList().remove(key, 1, json);
+                }
+            } catch (Exception e) {
+                log.error("Error deserializing suggestion for removal", e);
+            }
+        }
     }
 
     public void clearSuggestions(String code) {

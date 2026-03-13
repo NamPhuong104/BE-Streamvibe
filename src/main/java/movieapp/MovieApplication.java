@@ -1,9 +1,12 @@
 package movieapp;
 
+import jakarta.annotation.PostConstruct;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 import org.springframework.retry.annotation.EnableRetry;
 import org.springframework.scheduling.annotation.EnableScheduling;
+
+import java.util.TimeZone;
 
 //disable security
 //@SpringBootApplication(exclude = {
@@ -14,6 +17,11 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 @EnableScheduling
 @EnableRetry
 public class MovieApplication {
+    @PostConstruct
+    void setTimeZone() {
+        TimeZone.setDefault(TimeZone.getTimeZone("Asia/Ho_Chi_Minh"));
+    }
+    
     public static void main(String[] args) {
         SpringApplication.run(MovieApplication.class, args);
 
@@ -25,7 +33,6 @@ public class MovieApplication {
         System.out.println("📍 Homepage API (NEW):");
         System.out.println("   - Grouped: GET http://localhost:8080/api/v1/homepage/{initial|group1|group2}");
 
-        System.out.println("🏥 Health Check: http://localhost:8080/api/v1/health");
         System.out.println("");
         System.out.println("⏰ Cache Strategy: GROUPED REFRESH");
         System.out.println("   - Warm-up: After 10 seconds");

@@ -2,9 +2,11 @@ package movieapp.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import movieapp.dto.Room.Chat.ChatMessageDTO;
 import movieapp.dto.Room.RoomBrowseResponse;
 import movieapp.dto.Room.RoomCreateDTO;
 import movieapp.dto.Room.RoomResponse;
+import movieapp.service.RoomChatService;
 import movieapp.service.RoomService;
 import movieapp.util.annotation.ApiMessage;
 import org.springframework.web.bind.annotation.*;
@@ -17,6 +19,7 @@ import java.util.Map;
 @RequiredArgsConstructor
 public class RoomController {
     private final RoomService roomService;
+    private final RoomChatService roomChatService;
 
     @PostMapping
     @ApiMessage("Tạo phòng xem chung")
@@ -88,5 +91,11 @@ public class RoomController {
     @ApiMessage("Danh sách phòng đang hoạt động")
     public List<RoomBrowseResponse> browseRooms() {
         return roomService.getActiveRooms();
+    }
+
+    @GetMapping("/{code}/chat/history")
+    @ApiMessage("Lấy lịch sử chat")
+    public List<ChatMessageDTO> getChatHistory(@PathVariable String code) {
+        return roomChatService.getChatHistory(code);
     }
 }

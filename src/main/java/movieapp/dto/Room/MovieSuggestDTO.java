@@ -11,6 +11,7 @@ public class MovieSuggestDTO {
     private String posterUrl;
     private String thumbUrl;
     private Long suggestedByUserId;
+    private String suggestedByFullName;
     private String suggestedByUsername;
     private long suggestedAt;
 }

@@ -9,6 +9,7 @@ import lombok.Data;
 public class RoomMemberDTO {
     private Long userId;
     private String userName;
+    private String fullName;
     private String avatarUrl;
 
     @JsonProperty("isHost")

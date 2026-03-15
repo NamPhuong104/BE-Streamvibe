@@ -27,6 +27,7 @@ public class RoomService {
     private final UserService userService;
     private final SimpMessagingTemplate messagingTemplate;
     private final WsUserCacheService wsUserCache;
+    private final RoomChatService roomChatService;
     // Track host disconnect time for grace period
     private final Map<String, Instant> hostDisconnectTimes = new java.util.concurrent.ConcurrentHashMap<>();
 
@@ -37,16 +38,15 @@ public class RoomService {
         if (existingRoom != null)
             throw new CommonMessageException("Bạn đang ở phòng " + existingRoom + ". Vui lòng rời phòng trước.");
 
-        boolean isAdmin = currentUser.getRole().getName().contains("ADMIN");
-
         String code = roomRedis.generateUniqueCode();
 
-        String roomName = dto.getRoomName() != null && !dto.getRoomName().isBlank() ? dto.getRoomName() : currentUser.getUsername();
+        String roomName = dto.getRoomName() != null && !dto.getRoomName().isBlank() ? dto.getRoomName() : currentUser.getFullName();
 
         // Create room data
         Map<String, String> roomData = new HashMap<>();
         roomData.put("code", code);
         roomData.put("hostId", currentUser.getId().toString());
+        roomData.put("hostFullName", currentUser.getFullName());
         roomData.put("hostUsername", currentUser.getUsername());
         roomData.put("hostAvatarUrl", currentUser.getAvatarUrl() != null ? currentUser.getAvatarUrl() : "");
         roomData.put("roomName", roomName);
@@ -93,6 +93,7 @@ public class RoomService {
         if (requireApproval) {
             JoinRequestDTO request = JoinRequestDTO.builder()
                     .userId(currentUser.getId())
+                    .fullName(currentUser.getFullName())
                     .username(currentUser.getUsername())
                     .avatarUrl(currentUser.getAvatarUrl())
                     .requestedAt(Instant.now().toEpochMilli())
@@ -143,6 +144,9 @@ public class RoomService {
             closeRoom(code, "Host đã rời phòng");
         } else {
             roomRedis.removeMember(code, currentUser.getId());
+            String displayName = getDisplayName(currentUser);
+            roomChatService.sendSystemMessage(code, displayName + " đã rời phòng");
+
             broadcastMembers(code);
             log.info("User {} left room {}", currentUser.getUsername(), code);
         }
@@ -155,13 +159,18 @@ public class RoomService {
         String hostId = roomRedis.getRoomField(code, "hostId");
         if (userId.toString().equals(hostId)) throw new CommonMessageException("Host không thể tự kick chính mình");
 
+        User kickUer = userRepository.findById(userId).orElse(null);
+        String kickName = kickUer != null ? getDisplayName(kickUer) : "User";
+
         roomRedis.removeMember(code, userId);
+
 
         messagingTemplate.convertAndSend(
                 "/topic/room/" + code + "/kicked",
                 Map.of("userId", userId)
         );
 
+        roomChatService.sendSystemMessage(code, kickName + " đã bị kick khỏi phòng");
         broadcastMembers(code);
         log.info("User {} kicked from room {}", userId, code);
     }
@@ -198,6 +207,9 @@ public class RoomService {
     public void setMovie(String code, RoomResponse.RoomMovieDTO movie) {
         validateHost(code);
 
+        String oldMovieSlug = roomRedis.getRoomField(code, "movieSlug");
+        String oldEpisode = roomRedis.getRoomField(code, "currentEpisode");
+
         Map<String, String> updates = new HashMap<>();
 
         updates.put("movieSlug", movie.getSlug());
@@ -214,14 +226,20 @@ public class RoomService {
 
         roomRedis.removeSuggestionBySlug(code, movie.getSlug());
 
+        if (!movie.getSlug().equals(oldMovieSlug)) {
+            roomChatService.sendSystemMessage(code, "Chủ phòng đã đổi phim: " + movie.getName());
+        } else if (movie.getCurrentEpisode() != null && !movie.getCurrentEpisode().equals(oldEpisode)) {
+            roomChatService.sendSystemMessage(code, "Chủ phòng đã chuyển sang tập " + movie.getCurrentEpisode());
+        }
+
         messagingTemplate.convertAndSend("/topic/room/" + code + "/movie", movie);
     }
 
     public void suggestMovie(String code, MovieSuggestDTO suggestion, Principal principal) {
-        User currentuser = wsUserCache.getFullUser(principal);
+        User currentUser = wsUserCache.getFullUser(principal);
         validateRoomExists(code);
 
-        if (!roomRedis.isMember(code, currentuser.getId()))
+        if (!roomRedis.isMember(code, currentUser.getId()))
             throw new CommonMessageException("Bạn không ở trong phòng này");
 
         String currentMovieSlug = roomRedis.getRoomField(code, "movieSlug");
@@ -229,8 +247,9 @@ public class RoomService {
 
         if (roomRedis.suggestionExists(code, suggestion.getMovieSlug())) return;
 
-        suggestion.setSuggestedByUserId(currentuser.getId());
-        suggestion.setSuggestedByUsername(currentuser.getUsername());
+        suggestion.setSuggestedByUserId(currentUser.getId());
+        suggestion.setSuggestedByFullName(currentUser.getFullName());
+        suggestion.setSuggestedByUsername(currentUser.getUsername());
         suggestion.setSuggestedAt(Instant.now().toEpochMilli());
 
         roomRedis.addSuggestion(code, suggestion);
@@ -355,41 +374,20 @@ public class RoomService {
         log.info("User {} reconnected to room {}", user.getUsername(), roomCode);
     }
 
-    // ==================== SCHEDULED: GRACE PERIOD CHECK ====================
-    @Scheduled(fixedRate = 30000)
-    public void checkGracePeriods() {
-        Instant now = Instant.now();
-
-        new HashMap<>(hostDisconnectTimes).forEach((roomCode, disconnectTime) -> {
-            long elapsed = now.getEpochSecond() - disconnectTime.getEpochSecond();
-
-            if (elapsed >= HOST_GRACE_PERIOD_SECONDS) {
-                log.info("Grace period expired for room {}. Closing.", roomCode);
-                closeRoom(roomCode, "Host không kết nối lại. Phòng đã đóng.");
-                hostDisconnectTimes.remove(roomCode);
-            }
-        });
-    }
 
     // ==================== PRIVATE HELPERS ====================
     private void validateHostById(String code, Long userId) {
         String hostId = roomRedis.getRoomField(code, "hostId");
         if (!userId.toString().equals(hostId))
-            throw new CommonMessageException("Chỉ host mới có quyền thực hiện");
-    }
-
-    private User getUserFromWsPrincipal(Principal principal) {
-        if (principal instanceof JwtAuthenticationToken auth) {
-            String email = auth.getToken().getSubject();
-
-            return userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("User không tồn tại"));
-        }
-        throw new CommonMessageException("Yêu cầu xác thực WebSocket");
+            throw new CommonMessageException("Chỉ chủ phòng mới có quyền thực hiện");
     }
 
     private void addMemberToRoom(String code, User user) {
         roomRedis.addMember(code, user.getId());
         broadcastMembers(code);
+
+        String displayName = getDisplayName(user);
+        roomChatService.sendSystemMessage(code, displayName + " đã tham gia phòng");
         log.info("User {} joined room {}", user.getUsername(), code);
     }
 
@@ -421,6 +419,7 @@ public class RoomService {
                 .map(user -> RoomMemberDTO.builder()
                         .userId(user.getId())
                         .userName(user.getUsername())
+                        .fullName(getDisplayName(user))
                         .avatarUrl(user.getAvatarUrl())
                         .isHost(user.getId().toString().equals(hostId))
                         .build())
@@ -452,6 +451,7 @@ public class RoomService {
                 .roomName(getStr(data, "roomName"))
                 .host(RoomResponse.RoomHostDTO.builder()
                         .id(Long.parseLong(getStr(data, "hostId")))
+                        .fullName(getStr(data, "hostFullName"))
                         .username(getStr(data, "hostUsername"))
                         .avatarUrl(getStr(data, "hostAvatarUrl"))
                         .build())
@@ -490,7 +490,7 @@ public class RoomService {
     private void validateHost(String code, User user) {
         String hostId = roomRedis.getRoomField(code, "hostId");
         if (!user.getId().toString().equals(hostId))
-            throw new CommonMessageException("Chỉ host mới có quyền thực hiện");
+            throw new CommonMessageException("Chỉ chủ phòng mới có quyền thực hiện");
     }
 
     private String getStr(Map<Object, Object> map, String key) {
@@ -503,5 +503,13 @@ public class RoomService {
         Object val = map.get(key);
 
         return val != null ? val.toString() : defaultVal;
+    }
+
+    private String getDisplayName(User user) {
+        if (user.getFullName() != null && !user.getFullName().isBlank()) {
+            return user.getFullName();
+        }
+
+        return user.getUsername();
     }
 }

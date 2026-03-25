@@ -52,6 +52,7 @@ public class SecurityConfiguration {
                 "/api/v1/admin/blocked-keywords/list-blocked-keywords",
                 "/api/v1/health",
                 "/api/v1/rooms/browse",
+                "/api/v1/notifications/active",
                 "/ws/**"
         };
 

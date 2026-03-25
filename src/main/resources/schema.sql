@@ -119,6 +119,26 @@ CREATE TABLE IF NOT EXISTS blocked_keywords (
     updated_at TIMESTAMP
 );
 
+-- 8. Tạo bảng NOTIFICATION (không phụ thuộc)
+CREATE TABLE IF NOT EXISTS notifications (
+    id BIGSERIAL PRIMARY KEY,
+    title VARCHAR(255) NOT NULL,
+    message TEXT NOT NULL,
+    type VARCHAR(20) NOT NULL,
+    target VARCHAR(20) NOT NULL DEFAULT 'ALL',
+    severity VARCHAR(20) NOT NULL DEFAULT 'INFO',
+    image_url VARCHAR(500),
+    action_url VARCHAR(500),
+    action_text VARCHAR(100),
+    start_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    end_at TIMESTAMP,
+    active BOOLEAN DEFAULT TRUE,
+    pushed BOOLEAN DEFAULT FALSE,
+    created_by_id BIGINT REFERENCES users(id) ON DELETE SET NULL,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
 -- =====================================================
 -- INDEXES
 -- =====================================================

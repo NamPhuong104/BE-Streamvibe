@@ -4,6 +4,7 @@ import lombok.RequiredArgsConstructor;
 import movieapp.config.properties.JwtProperties;
 import movieapp.dto.Auth.ResLoginDTO;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
 import org.springframework.security.core.context.SecurityContext;
 import org.springframework.security.core.context.SecurityContextHolder;
@@ -30,6 +31,12 @@ public class SecurityUtil {
     public static Optional<String> getCurrentUserLogin() {
         SecurityContext securityContext = SecurityContextHolder.getContext();
         return Optional.ofNullable(extractPrincipal(securityContext.getAuthentication()));
+    }
+
+    public static boolean isAuthenticated() {
+        Authentication auth = SecurityContextHolder.getContext().getAuthentication();
+        if (auth == null || !auth.isAuthenticated()) return false;
+        return !(auth instanceof AnonymousAuthenticationToken);
     }
 
     private static String extractPrincipal(Authentication authentication) {

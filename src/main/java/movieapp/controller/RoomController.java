@@ -2,13 +2,13 @@ package movieapp.controller;
 
 import jakarta.validation.Valid;
 import lombok.RequiredArgsConstructor;
+import movieapp.dto.Room.*;
 import movieapp.dto.Room.Chat.ChatMessageDTO;
-import movieapp.dto.Room.RoomBrowseResponse;
-import movieapp.dto.Room.RoomCreateDTO;
-import movieapp.dto.Room.RoomResponse;
+import movieapp.dto.Room.Chat.ChatSendDTO;
 import movieapp.service.RoomChatService;
 import movieapp.service.RoomService;
 import movieapp.util.annotation.ApiMessage;
+import movieapp.util.annotation.RequireAdmin;
 import org.springframework.web.bind.annotation.*;
 
 import java.util.List;
@@ -97,5 +97,55 @@ public class RoomController {
     @ApiMessage("Lấy lịch sử chat")
     public List<ChatMessageDTO> getChatHistory(@PathVariable String code) {
         return roomChatService.getChatHistory(code);
+    }
+
+    // ==================== ADMIN ENDPOINTS ====================
+    @GetMapping("/admin/stats")
+    @RequireAdmin
+    @ApiMessage("Thống kê phòng xem chung")
+    public RoomStatsResponse getRoomStats(
+            @RequestParam(required = false) String search) {
+        return roomService.getRoomStats(search);
+    }
+
+    @GetMapping("/admin/{code}")
+    @RequireAdmin
+    @ApiMessage("Chi tiết phòng xem chung (Admin)")
+    public RoomAdminDetailResponse getAdminRoomDetail(@PathVariable String code) {
+        return roomService.getAdminRoomDetail(code);
+    }
+
+    @DeleteMapping("/admin/{code}")
+    @RequireAdmin
+    @ApiMessage("Đóng phòng xem chung (Admin)")
+    public Void adminCloseRoom(@PathVariable String code) {
+        roomService.adminCloseRoom(code);
+        return null;
+    }
+
+    @PostMapping("/admin/{code}/kick/{userId}")
+    @RequireAdmin
+    @ApiMessage("Admin kick user khỏi phòng")
+    public Void adminKickUser(@PathVariable String code, @PathVariable Long userId) {
+        roomService.adminKickUser(code, userId);
+        return null;
+    }
+
+    @PostMapping("/admin/{code}/chat")
+    @RequireAdmin
+    @ApiMessage("Admin gửi tin nhắn vào phòng")
+    public Void adminSendMessage(@PathVariable String code,
+                                 @RequestBody ChatSendDTO dto) {
+        roomService.adminSendMessage(code, dto);
+        return null;
+    }
+
+    @DeleteMapping("/admin/{code}/chat/{messageId}")
+    @RequireAdmin
+    @ApiMessage("Admin xóa tin nhắn")
+    public Void adminDeleteMessage(@PathVariable String code,
+                                   @PathVariable String messageId) {
+        roomChatService.adminDeleteMessage(code, messageId);
+        return null;
     }
 }

@@ -5,6 +5,7 @@ import lombok.extern.slf4j.Slf4j;
 import movieapp.entity.User;
 import movieapp.exception.CommonMessageException;
 import movieapp.repository.UserRepository;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationToken;
 import org.springframework.stereotype.Service;
 
@@ -50,6 +51,16 @@ public class WsUserCacheService {
         String email = auth.getToken().getSubject();
 
         return userRepository.findByEmail(email).orElseThrow(() -> new CommonMessageException("User không tồn tại"));
+    }
+
+    public boolean isAdmin(Principal principal) {
+        if (!(principal instanceof JwtAuthenticationToken auth)) return false;
+
+        Jwt jwt = auth.getToken();
+        Object priority = jwt.getClaim("rolePriority");
+        if (priority instanceof Number) return ((Number) priority).intValue() <= 10;
+
+        return false;
     }
 
     /**

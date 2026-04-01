@@ -65,4 +65,9 @@ public class RoomWebSocketController {
     public void typing(@DestinationVariable String code, Principal principal) {
         roomChatService.handleTyping(code, principal);
     }
+
+    @MessageMapping("/room/{code}/heartbeat")
+    public void heartbeat(@DestinationVariable String code, Principal principal) {
+        roomService.handleHeartbeat(code, principal);
+    }
 }

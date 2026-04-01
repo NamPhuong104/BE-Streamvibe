@@ -27,9 +27,35 @@ public class RoomRedisService {
     private static final String ROOM_CHAT_KEY = "room:%s:chat";
     private static final String CHAT_RATE_KEY = "chat:rate:%s:%s";
     private static final Duration CHAT_RATE_LIMIT = Duration.ofSeconds(2);
+    private static final String ROOM_HEARTBEAT_KEY = "room:%s:heartbeat";
 
     private final StringRedisTemplate redisTemplate;
     private final ObjectMapper objectMapper;
+
+    // ==================== HEARTBEAT ====================
+    public void updateHeartbeat(String code, Long userId) {
+        String key = String.format(ROOM_HEARTBEAT_KEY, code);
+        redisTemplate.opsForHash().put(key, userId.toString(), String.valueOf(System.currentTimeMillis()));
+
+        redisTemplate.expire(key, ROOM_TTL);
+    }
+
+    public Long getLastHeartbeat(String code, Long userId) {
+        String key = String.format(ROOM_HEARTBEAT_KEY, code);
+        Object val = redisTemplate.opsForHash().get(key, userId.toString());
+        if (val == null) return null;
+
+        try {
+            return Long.parseLong(val.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
+    }
+
+    public void removeHeartbeat(String code, Long userId) {
+        String key = String.format(ROOM_HEARTBEAT_KEY, code);
+        redisTemplate.opsForHash().delete(key, userId.toString());
+    }
 
 
     // ==================== ROOM CRUD ====================
@@ -77,7 +103,8 @@ public class RoomRedisService {
                 String.format(ROOM_MEMBERS_KEYS, code),
                 String.format(ROOM_PENDING_KEY, code),
                 String.format(ROOM_SUGGESTS_KEY, code),
-                String.format(ROOM_CHAT_KEY, code)
+                String.format(ROOM_CHAT_KEY, code),
+                String.format(ROOM_HEARTBEAT_KEY, code)
         ));
 
         // Xóa rate limit keys cho room này
@@ -181,6 +208,21 @@ public class RoomRedisService {
     }
 
     // ==================== MOVIE SUGGESTIONS ====================
+    public List<MovieSuggestDTO> getSuggestions(String code) {
+        String key = String.format(ROOM_SUGGESTS_KEY, code);
+        List<String> raw = redisTemplate.opsForList().range(key, 0, -1);
+        if (raw == null) return List.of();
+
+        return raw.stream().map(json -> {
+            try {
+                return objectMapper.readValue(json, MovieSuggestDTO.class);
+            } catch (Exception e) {
+                log.error("Error deserializing suggestion", e);
+                return null;
+            }
+        }).filter(Objects::nonNull).collect(Collectors.toList());
+    }
+
     public boolean suggestionExists(String code, String movieSlug) {
         String key = String.format(ROOM_SUGGESTS_KEY, code);
         List<String> raw = redisTemplate.opsForList().range(key, 0, -1);
@@ -411,5 +453,25 @@ public class RoomRedisService {
         Boolean wasSet = redisTemplate.opsForValue().setIfAbsent(key, "1", CHAT_RATE_LIMIT);
 
         return !Boolean.TRUE.equals(wasSet);
+    }
+
+    // ==================== PENDING REQUESTS (ADMIN) ====================
+
+    /**
+     * Lấy danh sách pending requests — dùng cho admin detail view
+     */
+    public List<JoinRequestDTO> getPendingRequests(String code) {
+        String key = String.format(ROOM_PENDING_KEY, code);
+        Set<String> pending = redisTemplate.opsForSet().members(key);
+        if (pending == null) return List.of();
+
+        return pending.stream().map(json -> {
+            try {
+                return objectMapper.readValue(json, JoinRequestDTO.class);
+            } catch (Exception e) {
+                log.error("Error deserializing pending request", e);
+                return null;
+            }
+        }).filter(Objects::nonNull).collect(Collectors.toList());
     }
 }

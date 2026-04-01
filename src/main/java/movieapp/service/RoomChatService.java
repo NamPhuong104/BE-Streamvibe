@@ -65,7 +65,8 @@ public class RoomChatService {
     public void deleteMessage(String code, ChatDeleteDTO dto, Principal principal) {
         User user = wsUserCache.getFullUser(principal);
 
-        if (!roomRedis.isMember(code, user.getId())) throw new CommonMessageException("Bạn không ở trong phòng này");
+        if (!roomRedis.isMember(code, user.getId()))
+            throw new CommonMessageException("Bạn không ở trong phòng này");
 
         ChatMessageDTO message = roomRedis.findChatMessageById(code, dto.getMessageId());
         if (message == null) return;
@@ -74,15 +75,18 @@ public class RoomChatService {
         String hostId = roomRedis.getRoomField(code, "hostId");
         boolean isHost = user.getId().toString().equals(hostId);
         boolean isOwner = user.getId().equals(message.getSenderId());
+        // ▶ FIX: Admin cũng có quyền xóa tin nhắn trong phòng
+        boolean isAdmin = wsUserCache.isAdmin(principal);
 
-        if (!isOwner && !isHost) throw new CommonMessageException("Bạn không có quyền xóa tin nhắn này");
+        if (!isOwner && !isHost && !isAdmin)
+            throw new CommonMessageException("Bạn không có quyền xóa tin nhắn này");
 
         boolean deleted = roomRedis.softDeleteChatMessage(code, dto.getMessageId());
 
         if (deleted) {
             messagingTemplate.convertAndSend("/topic/room/" + code + "/chat/delete", dto);
-            log.debug("Message {} deleted in room {} by {}",
-                    dto.getMessageId(), code, user.getUsername());
+            log.debug("Message {} deleted in room {} by {} (host={}, admin={})",
+                    dto.getMessageId(), code, user.getUsername(), isHost, isAdmin);
         }
     }
 
@@ -168,8 +172,8 @@ public class RoomChatService {
         if (dto.getContent().length() > MAX_MESSAGE_LENGTH)
             throw new CommonMessageException("Tin nhắn tối đa " + MAX_MESSAGE_LENGTH + " ký tự");
 
-        if (roomRedis.isChatRateLimited(code, user.getId()))
-            throw new CommonMessageException("Bạn đang gửi tin nhắn quá nhanh. Vui lòng chờ 2 giây.");
+//        if (roomRedis.isChatRateLimited(code, user.getId()))
+//            throw new CommonMessageException("Bạn đang gửi tin nhắn quá nhanh. Vui lòng chờ 2 giây.");
     }
 
     /**
@@ -209,6 +213,58 @@ public class RoomChatService {
         return builder.build();
     }
 
+    // ==================== ADMIN MESSAGES ====================
+
+    /**
+     * Admin gửi tin nhắn vào phòng mà KHÔNG cần join
+     * <p>
+     * Khác với sendMessage():
+     * - Không check membership
+     * - Không rate limit
+     * - type = "ADMIN" (frontend hiển thị badge admin)
+     */
+    public void sendAdminMessage(String code, ChatSendDTO dto, User admin) {
+        if (!roomRedis.roomExists(code)) throw new CommonMessageException("Phòng không tồn tại");
+        if (dto.getContent() == null || dto.getContent().trim().isEmpty())
+            throw new CommonMessageException("Tin nhắn không được để trống");
+
+        if (dto.getContent().length() > MAX_MESSAGE_LENGTH)
+            throw new CommonMessageException("Tin nhắn tối đa " + MAX_MESSAGE_LENGTH + " ký tự");
+
+        ChatMessageDTO.ChatMessageDTOBuilder builder = ChatMessageDTO.builder().id(UUID.randomUUID().toString())
+                .type("ADMIN")
+                .senderId(admin.getId())
+                .senderUsername(admin.getUsername())
+                .senderFullName(getDisplayName(admin))
+                .senderAvatarUrl(admin.getAvatarUrl())
+                .content(dto.getContent().trim())
+                .videoTimestamp(getCurrentVideoTimestamp(code))
+                .createdAt(System.currentTimeMillis())
+                .deleted(false);
+
+        // Handle reply
+        if (dto.getReplyToId() != null && !dto.getReplyToId().isBlank()) {
+            ChatMessageDTO original = roomRedis.findChatMessageById(code, dto.getReplyToId());
+            if (original != null && !Boolean.TRUE.equals(original.getDeleted())) {
+                builder.replyToId(original.getId());
+                String preview = original.getContent();
+                if (preview != null && preview.length() > REPLY_PREVIEW_LENGTH)
+                    preview = preview.substring(0, REPLY_PREVIEW_LENGTH) + "...";
+                builder.replyToContent(preview);
+                builder.replyToSenderName(
+                        original.getSenderFullName() != null
+                                ? original.getSenderFullName()
+                                : original.getSenderUsername());
+            }
+        }
+
+        ChatMessageDTO message = builder.build();
+        roomRedis.addChatMessage(code, message);
+        messagingTemplate.convertAndSend("/topic/room/" + code + "/chat", message);
+
+        log.info("Admin {} sent message in room {}", admin.getUsername(), code);
+    }
+
     /**
      * Lấy thời gian video hiện tại (nếu đang phát)
      * <p>
@@ -231,6 +287,23 @@ public class RoomChatService {
         }
 
         return null;
+    }
+
+    public void adminDeleteMessage(String code, String messageId) {
+        if (!roomRedis.roomExists(code))
+            throw new CommonMessageException("Phòng không tồn tại");
+
+        ChatMessageDTO message = roomRedis.findChatMessageById(code, messageId);
+        if (message == null) return;
+        if (Boolean.TRUE.equals(message.getDeleted())) return;
+
+        boolean deleted = roomRedis.softDeleteChatMessage(code, messageId);
+        if (deleted) {
+            ChatDeleteDTO dto = new ChatDeleteDTO();
+            dto.setMessageId(messageId);
+            messagingTemplate.convertAndSend("/topic/room/" + code + "/chat/delete", dto);
+            log.info("Admin deleted message {} in room {}", messageId, code);
+        }
     }
 
     /**

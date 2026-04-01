@@ -21,6 +21,7 @@ public class RoomResponse {
     private boolean requireApproval;
     private List<RoomMemberDTO> members;
     private int pendingCount;
+    private List<MovieSuggestDTO> suggestions;
     private Instant createdAt;
 
     @Data

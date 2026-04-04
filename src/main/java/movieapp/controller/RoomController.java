@@ -99,6 +99,12 @@ public class RoomController {
         return roomChatService.getChatHistory(code);
     }
 
+    @GetMapping("/{code}/current-time")
+    @ApiMessage("Lấy thời gian hiện tại của chủ phòng")
+    public RoomCurrentTimeResponse getCurrentTime(@PathVariable String code) {
+        return roomService.getCurrentTime(code);
+    }
+
     // ==================== ADMIN ENDPOINTS ====================
     @GetMapping("/admin/stats")
     @RequireAdmin

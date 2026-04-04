@@ -90,6 +90,7 @@ public class NotificationService {
         notification.setActionUrl(dto.getActionUrl());
         notification.setActionText(dto.getActionText());
         if (dto.getStartAt() != null) notification.setStartAt(dto.getStartAt());
+        if (dto.getEndAt() != null) notification.setEndAt(dto.getEndAt());
 
         notification.setPushed(false);
 

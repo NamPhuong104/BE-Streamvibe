@@ -17,6 +17,10 @@ import java.security.Principal;
 import java.time.Duration;
 import java.time.Instant;
 import java.util.*;
+import java.util.concurrent.Executors;
+import java.util.concurrent.ScheduledExecutorService;
+import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.TimeUnit;
 import java.util.stream.Collectors;
 
 @Service
@@ -38,6 +42,16 @@ public class RoomService {
     private final Map<String, Instant> hostDisconnectTimes = new java.util.concurrent.ConcurrentHashMap<>();
     // Track member disconnect — key = "roomCode:userId"
     private final Map<String, Instant> memberDisconnectTimes = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private final ScheduledExecutorService disconnectNotifyScheduler = Executors.newSingleThreadScheduledExecutor(r -> {
+        Thread t = new Thread(r, "host-disconnect-notify");
+        t.setDaemon(true);
+        return t;
+    });
+
+    private final Map<String, ScheduledFuture<?>> pendingDisconnectBroadcasts = new java.util.concurrent.ConcurrentHashMap<>();
+
+    private static final long HOST_DISCONNECT_NOTIFY_DELAY_SECONDS = 15;
 
     // ==================== HEARTBEAT ====================
     public void handleHeartbeat(String code, Principal principal) {
@@ -200,25 +214,47 @@ public class RoomService {
 
         if (!isAdmin) validateHostById(code, userId);
 
+        String action = state.getAction();
         Map<String, String> updates = new HashMap<>();
         updates.put("currentTime", String.valueOf(state.getCurrentTime()));
+        updates.put("lastTimeUpdate", String.valueOf(System.currentTimeMillis()));
 
         if (state.getVideoUrl() != null) updates.put("videoUrl", state.getVideoUrl());
-
         if (state.getEpisodeSlug() != null) updates.put("currentEpisode", state.getEpisodeSlug());
         if (state.getSpeed() > 0) updates.put("speed", String.valueOf(state.getSpeed()));
 
-        String action = state.getAction();
+        switch (action) {
+            case "PLAY":
+                updates.put("state", "PLAYING");
+                break;
 
-        if ("PLAY".equals(action)) {
-            updates.put("state", "PLAYING");
-        } else if ("PAUSE".equals(action)) {
-            updates.put("state", "WAITING");
+            case "PAUSE":
+                updates.put("state", "WAITING");
+                break;
+
+            case "SEEK":
+                break;
+
+            case "EPISODE_CHANGE":
+                updates.put("state", "PLAYING");
+                updates.put("currentTime", "0");
+                break;
+
+            case "HOST_TIME_UPDATE":
+                // CHỈ update Redis, KHÔNG broadcast
+                // Dùng cho: nút Đồng bộ + member mới join
+                updates.put("serverIndex", String.valueOf(state.getServerIndex()));
+                roomRedis.updateRoomFields(code, updates);
+                return;
+
+            default:
+                break;
         }
 
         updates.put("serverIndex", String.valueOf(state.getServerIndex()));
         roomRedis.updateRoomFields(code, updates);
 
+        // Broadcast cho members (trừ HOST_TIME_UPDATE)
         state.setTimestamp(System.currentTimeMillis());
         messagingTemplate.convertAndSend("/topic/room/" + code + "/state", state);
     }
@@ -360,34 +396,28 @@ public class RoomService {
         if (user.getId().toString().equals(hostId)) {
             // Host disconnected → start grace period
             hostDisconnectTimes.put(roomCode, Instant.now());
+            ScheduledFuture<?> existing = pendingDisconnectBroadcasts.remove(roomCode);
+            if (existing != null) existing.cancel(false);
 
-            // AUTO-PAUSE: Đọc currentTime từ Redis và broadcast PAUSE
-            String currentTimerStr = roomRedis.getRoomField(roomCode, "currentTime");
-            double currentTime = parseDoubleSafe(currentTimerStr, 0);
+            ScheduledFuture<?> future = disconnectNotifyScheduler.schedule(() -> {
+                pendingDisconnectBroadcasts.remove(roomCode);
 
-            String speedStr = roomRedis.getRoomField(roomCode, "speed");
-            double speed = parseDoubleSafe(speedStr, 1);
+                if (hostDisconnectTimes.containsKey(roomCode) && roomRedis.roomExists(roomCode)) {
+                    long elapsed = Duration.between(hostDisconnectTimes.get(roomCode), Instant.now()).getSeconds();
+                    long remaining = HOST_DISCONNECT_NOTIFY_DELAY_SECONDS - elapsed;
+                    messagingTemplate.convertAndSend(
+                            "/topic/room/" + roomCode + "/host-status",
+                            Map.of("status", "disconnected",
+                                    "graceSeconds", Math.max(remaining, 0)));
 
-            // Update room state to WAITING (paused)
-            roomRedis.updateRoomField(roomCode, "state", "WAITING");
+                    log.info("Host disconnect confirmed for room {} (after {}s delay). " +
+                                    "Notifying members. Grace remaining: {}s",
+                            roomCode, HOST_DISCONNECT_NOTIFY_DELAY_SECONDS, remaining);
 
-            // Broadcast PAUSE to all members
-            RoomStateDTO pauseState = RoomStateDTO.builder()
-                    .action("PAUSE")
-                    .currentTime(currentTime)
-                    .videoUrl(null)
-                    .episodeSlug(null)
-                    .serverIndex(0)
-                    .speed(speed)
-                    .timestamp(System.currentTimeMillis())
-                    .build();
-            messagingTemplate.convertAndSend("/topic/room/" + roomCode + "/state", pauseState);
+                }
+            }, HOST_DISCONNECT_NOTIFY_DELAY_SECONDS, TimeUnit.SECONDS);
 
-            // Broadcast host status
-            log.info("Host {} disconnected from room {}. Grace period started. currentTime={}",
-                    user.getUsername(), roomCode, currentTime);
-            messagingTemplate.convertAndSend("/topic/room/" + roomCode + "/host-status", Map.of("status", "disconnected", "graceSeconds", HOST_GRACE_PERIOD_SECONDS, "currentTime", currentTime));
-
+            pendingDisconnectBroadcasts.put(roomCode, future);
         } else {
             // ═══ MEMBER DISCONNECT → Grace period 3 phút ═══
             String key = memberKey(roomCode, user.getId());
@@ -414,14 +444,30 @@ public class RoomService {
 
         String hostId = roomRedis.getRoomField(roomCode, "hostId");
         if (user.getId().toString().equals(hostId)) {
-            if (hostDisconnectTimes.remove(roomCode) != null) {
-                messagingTemplate.convertAndSend("/topic/room/" + roomCode + "/host-status",
-                        Map.of("status", "connected"));
+            boolean wasDisconnected = hostDisconnectTimes.remove(roomCode) != null;
+
+            if (wasDisconnected) {
+                // Cancel pending broadcast nếu chưa gửi
+                ScheduledFuture<?> pending = pendingDisconnectBroadcasts.remove(roomCode);
+
+                if (pending != null && !pending.isDone()) {
+                    // ★ Broadcast CHƯA được gửi → cancel → members không biết gì
+                    pending.cancel(false);
+                    log.info("Host {} reconnected quickly (< {}s). No UI impact for room {}.",
+                            user.getUsername(), HOST_DISCONNECT_NOTIFY_DELAY_SECONDS, roomCode);
+                } else {
+                    // ★ Broadcast ĐÃ được gửi → phải gửi "connected" để undo
+                    messagingTemplate.convertAndSend(
+                            "/topic/room/" + roomCode + "/host-status",
+                            Map.of("status", "connected"));
+                    log.info("Host {} reconnected to room {}. Notified members (undo disconnect).",
+                            user.getUsername(), roomCode);
+                }
+
                 broadcastMembers(roomCode);
-                log.info("Host {} reconnected to room {}. Grace period cancelled.",
-                        user.getUsername(), roomCode);
             }
         } else {
+            // ═══ MEMBER RECONNECT — giữ nguyên ═══
             String key = memberKey(roomCode, user.getId());
             if (memberDisconnectTimes.remove(key) != null) {
                 broadcastMembers(roomCode);
@@ -429,6 +475,36 @@ public class RoomService {
                         user.getUsername(), roomCode);
             }
         }
+    }
+
+    public RoomCurrentTimeResponse getCurrentTime(String code) {
+        validateRoomExists(code);
+
+        double savedTime = parseDoubleSafe(roomRedis.getRoomField(code, "currentTime"), 0);
+        String state = roomRedis.getRoomField(code, "state");
+        double speed = parseDoubleSafe(roomRedis.getRoomField(code, "speed"), 1);
+        String lastUpdateStr = roomRedis.getRoomField(code, "lastTimeUpdate");
+        String episode = roomRedis.getRoomField(code, "currentEpisode");
+        String videoUrl = roomRedis.getRoomField(code, "videoUrl");
+
+        double estimatedTime = savedTime;
+        if ("PLAYING".equals(state) && lastUpdateStr != null) {
+            try {
+                long lastUpdate = Long.parseLong(lastUpdateStr);
+                double elapsed = (System.currentTimeMillis() - lastUpdate) / 1000.0;
+                estimatedTime = savedTime + (elapsed * speed);
+            } catch (NumberFormatException ignored) {
+            }
+        }
+
+        return RoomCurrentTimeResponse.builder()
+                .currentTime(estimatedTime)
+                .state(state != null ? state : "WAITING")
+                .speed(speed)
+                .episode(episode != null ? episode : "")
+                .videoUrl(videoUrl != null ? videoUrl : "")
+                .timestamp(System.currentTimeMillis())
+                .build();
     }
 
     // ==================== SCHEDULED CLEANUP ====================
@@ -764,6 +840,9 @@ public class RoomService {
     }
 
     private void closeRoom(String code, String reason) {
+        ScheduledFuture<?> pending = pendingDisconnectBroadcasts.remove(code);
+        if (pending != null) pending.cancel(false);
+        
         messagingTemplate.convertAndSend("/topic/room/" + code + "/closed", Map.of("reason", reason));
 
         Set<String> members = roomRedis.getMembers(code);

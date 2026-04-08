@@ -190,7 +190,8 @@ public class RoomChatService {
                 .content(dto.getContent().trim())
                 .videoTimestamp(getCurrentVideoTimestamp(code))
                 .createdAt(System.currentTimeMillis())
-                .deleted(false);
+                .deleted(false)
+                .mentions(dto.getMentions());
 
         // Handle reply
         if (dto.getReplyToId() != null && !dto.getReplyToId().isBlank()) {
